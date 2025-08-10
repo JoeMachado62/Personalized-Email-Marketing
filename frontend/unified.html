@@ -1208,6 +1208,36 @@
             document.getElementById('processingSection').style.display = 'block';
             updateStep(4);
 
+            try {
+                // Now upload and process with campaign context
+                const formData = new FormData();
+                formData.append('file', currentFile);
+                formData.append('options', JSON.stringify({
+                    column_mappings: window.savedMappings || userMappings,
+                    job_id: window.savedJobId || currentJobId,
+                    campaign_context: window.campaignContext
+                }));
+                
+                const uploadResponse = await fetch(`${API_BASE}/jobs/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!uploadResponse.ok) {
+                    throw new Error('Failed to start processing');
+                }
+                
+                const job = await uploadResponse.json();
+                currentJobId = job.job_id;
+                
+                // Start monitoring
+                monitorProgress();
+                
+            } catch (error) {
+                showAlert(`Error: ${error.message}`, 'error');
+            }
+        }
+
         function showAlert(message, type) {
             const alert = document.getElementById('alert');
             alert.className = `alert alert-${type} show`;
@@ -1219,6 +1249,7 @@
                 }, 5000);
             }
         }
+
     </script>
 </body>
 </html>

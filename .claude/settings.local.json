@@ -5,7 +5,10 @@
       "Bash(python test_installation.py:*)",
       "Bash(pip install:*)",
       "Bash(python:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(cp:*)",
+      "Bash(pkill:*)",
+      "Bash(mv:*)"
     ],
     "deny": []
   }

@@ -210,7 +210,10 @@ class MCPClientManager:
 
 
 class FetchMCPClient:
-    """Client for Fetch MCP server"""
+    """
+    Client for Fetch MCP server - uses httpx + markdownify for HTML to Markdown conversion.
+    This provides the same functionality as MCP Fetch server but with direct Python implementation.
+    """
     
     def __init__(self, config: Dict[str, Any]):
         self.config = config
@@ -219,28 +222,90 @@ class FetchMCPClient:
     async def fetch(self, url: str, max_length: int = 5000, 
                    start_index: int = 0, raw: bool = False) -> Dict[str, Any]:
         """
-        Fetch content from URL using MCP server.
+        Fetch content from URL and convert to Markdown.
         
-        This is a simplified implementation - in production, you would:
-        1. Start the MCP server process
-        2. Communicate via stdio/HTTP
-        3. Parse the response
+        This uses httpx for fetching and markdownify for HTML->Markdown conversion,
+        which is exactly what MCP Fetch server does internally.
+        
+        Rate Limiting: None from this client. Individual websites may rate limit.
         """
-        # Simplified mock implementation
-        # In production, this would communicate with the actual MCP server
-        logger.info(f"MCP Fetch: {url} (start={start_index}, max={max_length})")
-        
-        # For now, return a structure that indicates MCP would be used
-        return {
-            'url': url,
-            'content': f"[MCP Fetch would retrieve content from {url}]",
-            'metadata': {
-                'fetched_via': 'mcp_fetch',
-                'start_index': start_index,
-                'max_length': max_length,
-                'raw': raw
+        try:
+            import httpx
+            from markdownify import markdownify as md
+            from bs4 import BeautifulSoup
+            
+            logger.info(f"Fetching {url} (converting to Markdown)")
+            
+            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+                # Add headers to look like a real browser
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+                
+                response = await client.get(url, headers=headers)
+                response.raise_for_status()
+                
+                if raw:
+                    # Return raw HTML
+                    content = response.text[start_index:start_index + max_length]
+                    return {
+                        'url': url,
+                        'content': content,
+                        'metadata': {
+                            'fetched_via': 'mcp_fetch_raw',
+                            'success': True
+                        }
+                    }
+                else:
+                    # Parse and convert to Markdown
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    # Remove script and style elements
+                    for script in soup(["script", "style", "meta", "link"]):
+                        script.decompose()
+                    
+                    # Get title
+                    title = soup.title.string if soup.title else ''
+                    
+                    # Convert to markdown
+                    markdown = md(str(soup), heading_style="ATX", strip=['a'])
+                    
+                    # Apply start_index and max_length
+                    if start_index > 0:
+                        markdown = markdown[start_index:]
+                    if len(markdown) > max_length:
+                        markdown = markdown[:max_length] + "..."
+                    
+                    logger.info(f"Converted {len(response.text)} chars HTML to {len(markdown)} chars Markdown")
+                    
+                    return {
+                        'url': url,
+                        'content': markdown,
+                        'title': title,
+                        'metadata': {
+                            'fetched_via': 'mcp_fetch_markdown',
+                            'success': True,
+                            'original_length': len(response.text),
+                            'markdown_length': len(markdown)
+                        }
+                    }
+                    
+        except httpx.HTTPStatusError as e:
+            logger.warning(f"HTTP error fetching {url}: {e.response.status_code}")
+            return {
+                'url': url,
+                'content': '',
+                'error': f"HTTP {e.response.status_code}",
+                'metadata': {'fetched_via': 'mcp_fetch_failed', 'success': False}
             }
-        }
+        except Exception as e:
+            logger.error(f"Error fetching {url}: {e}")
+            return {
+                'url': url,
+                'content': '',
+                'error': str(e),
+                'metadata': {'fetched_via': 'mcp_fetch_failed', 'success': False}
+            }
     
     async def close(self):
         """Close MCP server connection"""

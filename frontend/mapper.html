@@ -762,7 +762,7 @@
                 const job = await response.json();
                 
                 // Redirect to monitoring page
-                window.location.href = `/test.html?job=${job.job_id}`;
+                window.location.href = `test.html?job=${job.job_id}`;
                 
             } catch (error) {
                 showAlert(`Error: ${error.message}`, 'error');
