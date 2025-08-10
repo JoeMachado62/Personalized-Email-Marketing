@@ -1,16 +1,23 @@
 # Profile Building & Data Interpretation
 
 ## Overview
-This document outlines how raw scraped data is transformed into comprehensive business profiles using AI interpretation and structured extraction.
+This document outlines how raw scraped data from the current Selenium + MCP Fetch pipeline is transformed into comprehensive business profiles using AI interpretation and structured extraction.
 
 ## Profile Building Pipeline
 
+### Current Implementation: Selenium + MCP Integration
+The profile building process works with clean data from our working architecture:
+
+1. **Selenium Web Search** (`auto_enrich/search_with_selenium.py`) - Real Chrome browser search
+2. **MCP Fetch Conversion** (`auto_enrich/mcp_client.py`) - HTML → Markdown processing  
+3. **DataInterpreter** (`auto_enrich/data_interpreter.py`) - AI-powered profile assembly
+
 ### DataInterpreter (`auto_enrich/data_interpreter.py`)
 Core component that uses AI to:
-- Extract structured information from unstructured data
-- Identify key business attributes
-- Generate personalized content
-- Build comprehensive profiles
+- Extract structured information from clean Markdown content
+- Identify key business attributes from MCP-processed data
+- Generate personalized content based on scraped information
+- Build comprehensive profiles from multi-source data
 
 ## Profile Components
 

@@ -62,18 +62,32 @@ campaign_context = {
 }
 ```
 
-### Search Execution
+### Current Search Implementation
 
-#### Primary Engine: Selenium with Chrome
-- Uses real browser to avoid bot detection
-- Implements `RealChromeSearch` class
-- Extracts Google My Business panels
-- Handles JavaScript-rendered content
+#### Primary Engine: Selenium with Real Chrome Browser
+- **Location**: `auto_enrich/search_with_selenium.py`
+- **Class**: `RealChromeSearch`
+- **Benefits**: 
+  - Uses real Chrome browser to avoid bot detection
+  - Extracts Google My Business panels automatically
+  - Handles JavaScript-rendered content
+  - Appears as genuine user activity
+  - Successfully processes search results without CAPTCHAs
 
-#### Fallback Strategy
-1. Google Search (primary)
-2. DuckDuckGo (fallback)
-3. Bing (final fallback)
+#### Content Processing: MCP Fetch Integration
+- **Location**: `auto_enrich/mcp_client.py`
+- **Function**: HTML-to-Markdown conversion
+- **Benefits**:
+  - No API costs (runs locally)
+  - Clean text extraction from web pages
+  - Preserves document structure
+  - Fast processing (~1-2 seconds per page)
+
+#### Architecture Flow
+1. **Search**: Selenium Chrome → Google Search Results
+2. **Extract**: Parse search result URLs and snippets
+3. **Fetch**: MCP Fetch converts web pages to Markdown
+4. **Fallback**: Selenium direct scraping if MCP unavailable
 
 ### Best Practices
 

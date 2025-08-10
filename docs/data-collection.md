@@ -5,12 +5,18 @@ This document describes the multi-source data collection system that gathers com
 
 ## Data Collection Architecture
 
-### WebDataGatherer (`auto_enrich/web_scraper.py`)
-Primary class responsible for orchestrating data collection:
-- Search engine queries
-- Website scraping
-- Business directory extraction
-- Social media discovery
+### Current Implementation: Selenium + MCP Fetch
+
+**Primary Components:**
+- **`SeleniumWebGatherer`** (`auto_enrich/web_scraper_selenium.py`) - Main orchestration class
+- **`RealChromeSearch`** (`auto_enrich/search_with_selenium.py`) - Real Chrome browser search
+- **`MCPClientManager`** (`auto_enrich/mcp_client.py`) - HTML-to-Markdown conversion
+
+**Key Benefits:**
+- Uses real Chrome browser (no bot detection)
+- MCP Fetch provides free HTML-to-Markdown conversion
+- Reliable processing without API costs
+- Fallback to Selenium scraping when needed
 
 ## Collection Strategy
 
@@ -107,28 +113,40 @@ gathered_data = {
 }
 ```
 
-## Technical Implementation
+## Current Technical Implementation
 
-### Playwright Configuration
-```python
-browser = await playwright.chromium.launch(
-    headless=True,
-    args=['--disable-blink-features=AutomationControlled']
-)
-context = await browser.new_context(
-    viewport={'width': 1920, 'height': 1080},
-    user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
-)
-```
-
-### Selenium Alternative
-For sites with aggressive bot detection:
+### Selenium Chrome Browser Configuration
+**Primary Search Engine** (`auto_enrich/search_with_selenium.py`):
 ```python
 from selenium import webdriver
-options = webdriver.ChromeOptions()
+from selenium.webdriver.chrome.options import Options
+
+options = Options()
 options.add_argument("--disable-blink-features=AutomationControlled")
-driver = webdriver.Chrome(options=options)
+options.add_experimental_option("excludeSwitches", ["enable-automation"])
+options.add_argument("--window-size=1920,1080")
+
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 ```
+
+### MCP Fetch Implementation
+**Content Processing** (`auto_enrich/mcp_client.py`):
+```python
+async def fetch(self, url: str, max_length: int = 5000) -> Dict[str, Any]:
+    """Fetch and convert HTML to Markdown using httpx + markdownify"""
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        response = await client.get(url, headers={'User-Agent': 'Mozilla/5.0...'})
+        soup = BeautifulSoup(response.text, 'html.parser')
+        markdown = markdownify(str(soup), heading_style="ATX")
+        return {'content': markdown, 'title': soup.title.string}
+```
+
+### Integration Flow
+1. **Selenium searches** Google with real Chrome browser
+2. **MCP Fetch processes** identified websites (HTML → Markdown)  
+3. **Fallback scraping** uses Selenium if MCP unavailable
+4. **Data extraction** from clean Markdown content
 
 ## Error Handling
 

@@ -27,11 +27,10 @@ An AI-powered universal enrichment platform that transforms CSV business data in
 ```bash
 # Install core dependencies
 pip install -r requirements.txt
-playwright install  # Browser automation
 
-# Configure API keys
+# Configure API keys and MCP
 cp .env.example .env
-vim .env  # Add LLM_API_KEY
+vim .env  # Add LLM_API_KEY, enable ENABLE_MCP_FETCH=true
 
 # Run enrichment
 python -m auto_enrich.enricher --input data.csv --output enriched.csv
@@ -49,18 +48,21 @@ Profile Building → Content Generation → Enriched CSV Output
 
 #### 1. Search & Discovery Layer
 **Module**: `auto_enrich/search_query_optimizer.py`  
+**Primary Implementation**: `auto_enrich/search_with_selenium.py` (Real Chrome Browser)
 **Documentation**: [docs/search-optimization.md](docs/search-optimization.md)
 - Intelligent query construction
-- Multi-engine search orchestration
-- Bot detection avoidance (Selenium)
+- Real Chrome browser search (no bot detection)
+- Google My Business panel extraction
+- Clean search result processing
 
 #### 2. Data Collection Layer
-**Module**: `auto_enrich/web_scraper.py`  
+**Primary Module**: `auto_enrich/web_scraper_selenium.py` (Selenium + MCP)
+**MCP Integration**: `auto_enrich/mcp_client.py` (HTML→Markdown)
 **Documentation**: [docs/data-collection.md](docs/data-collection.md)
-- Multi-source web scraping
-- Contact information extraction
-- Social media discovery
-- Business directory mining
+- Selenium-based web scraping with real Chrome browser
+- MCP Fetch HTML-to-Markdown conversion (no API costs)
+- Contact information extraction from clean Markdown
+- Social media discovery and business directory mining
 
 #### 3. Profile Building Layer
 **Module**: `auto_enrich/data_interpreter.py`  

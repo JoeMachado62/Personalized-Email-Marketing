@@ -77,8 +77,8 @@ async def process_job(job_id: str):
                 # Update progress
                 processed_records = end_idx
                 JobService.update_job(job_id, {
-                    'processed_records': processed_records,
-                    'progress_percentage': (processed_records / total_records) * 100
+                    'processed_records': processed_records
+                    # progress_percentage removed - calculated on the fly in API
                 })
                 
                 logger.info(f"Processed {processed_records}/{total_records} records")

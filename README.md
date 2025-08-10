@@ -1,25 +1,24 @@
-# Auto Enrich Application
+# AI Sales Agent - Personalized Email Marketing Platform
 
-This repository contains a prototype for a data enrichment of user provided marketing list. The initial MVP will use a specific pipeline targeting used car dealerships. Given a CSV of basic dealership
-information (name, address, phone, email), the application attempts
-to discover each dealer’s website, infer owner names and contact
-details, and generate personalized marketing copy. The generated
-content includes a subject line, a multi‑line icebreaker and a
-“hot button” topic relevant to the dealer’s business.
+This repository contains a comprehensive AI-powered data enrichment platform for personalized email marketing. The system transforms CSV business data into comprehensive profiles with personalized marketing content. The current implementation targets used car dealerships but can be adapted for any industry.
 
-## Features
+Given a CSV of basic business information (name, address, phone), the application:
+- Discovers business websites using intelligent search
+- Extracts owner contact information and business details
+- Generates personalized email content with subject lines and icebreakers
+- Identifies "hot button" topics relevant to each business
 
-* **Asynchronous scraping** using Playwright to perform web searches
-  for dealer websites. The scraper is simplistic and can be extended
-  to extract additional contact information from the site itself.
-* **AI‑driven content generation** via large language models (LLMs).
-  It composes prompts that incorporate known details about each
-  dealership and returns short marketing segments.
-* **Concurrency control** to limit the number of simultaneous network
-  requests, reducing the risk of hitting rate limits or CAPTCHAs.
-* **Configurable via environment variables.** API keys and model
-  names are read from a `.env` file. An `.env.example` file
-  documents the expected variables.
+## Current Architecture
+
+The system uses a modern, reliable architecture:
+
+* **Selenium-based web scraping** using real Chrome browsers to perform web searches and avoid bot detection
+* **MCP Fetch integration** for efficient HTML-to-Markdown conversion with no API costs
+* **FastAPI web application** with intuitive web interface for CSV uploads and job monitoring
+* **Intelligent column mapping** with auto-detection and manual override capabilities
+* **AI-driven content generation** via OpenAI GPT models with campaign context awareness
+* **Real-time job monitoring** with progress tracking and status updates
+* **Concurrent processing** with configurable limits to balance speed and reliability
 
 ## Getting Started
 
@@ -27,37 +26,72 @@ content includes a subject line, a multi‑line icebreaker and a
 
    ```bash
    pip install -r requirements.txt
-   # Install browser binaries for Playwright
-   playwright install
+   # Install Selenium WebDriver (automatically managed)
+   # MCP Fetch server is installed automatically
    ```
 
 2. **Configure environment:**
 
-   Copy `.env.example` to `.env` and populate the required values,
-   especially `LLM_API_KEY` and `LLM_MODEL_NAME`. You can also set
-   optional keys for future integrations (Tavily, Perplexity).
+   Copy `.env.example` to `.env` and populate the required values:
+   ```env
+   LLM_API_KEY=your-openai-api-key
+   LLM_MODEL=gpt-4o-mini
+   ENABLE_MCP_FETCH=true
+   SEARCH_PROVIDER=selenium
+   ```
 
-3. **Run enrichment:**
+3. **Start the application:**
+
+   ```bash
+   python run_server.py
+   ```
+
+   This starts both the FastAPI backend (port 8000) and opens the web interface.
+
+4. **Access the web interface:**
+
+   - **Main interface:** http://localhost:8000/static/unified.html
+   - **API documentation:** http://localhost:8000/docs
+   - **Simple upload:** http://localhost:8000/static/test.html
+
+5. **Alternative command-line usage:**
 
    ```bash
    python -m auto_enrich.enricher --input path/to/input.csv --output path/to/output.csv
    ```
 
-   You can adjust concurrency with the `--concurrency` flag to control
-   how many enrichment jobs run in parallel.
+## System Components
 
-## Extending the Pipeline
+### Core Modules
 
-* **Improve Scraping:** The current implementation of
-  `extract_contact_info` is a stub. You could add logic to fetch the
-  discovered website, parse HTML to find phone numbers, emails or
-  owner names using regexes or libraries such as BeautifulSoup.
-* **Use Additional Research APIs:** Integrate services like Tavily or
-  Perplexity to gather more context about a dealership (e.g. years
-  in business, specialization). Use the provided API key variables.
-* **Expose as a Web Service:** With FastAPI or Flask you can wrap
-  `enrich_dataframe` in an HTTP endpoint to trigger enrichment via a
-  REST API. See the commented dependencies in `requirements.txt`.
+- **`auto_enrich/web_scraper.py`** - Selenium-based web scraping with MCP Fetch integration
+- **`auto_enrich/search_with_selenium.py`** - Real Chrome browser search implementation
+- **`auto_enrich/mcp_client.py`** - MCP Fetch client for HTML-to-Markdown conversion
+- **`app/main.py`** - FastAPI web application with REST API
+- **`frontend/`** - Web interface files (HTML, CSS, JavaScript)
+
+### Web Interface Features
+
+- **Unified Workflow:** Single-page upload with integrated column mapping
+- **Progress Monitoring:** Real-time job status and progress tracking  
+- **Column Mapping:** Auto-detection with manual override capabilities
+- **Campaign Context:** Configurable personalization parameters
+- **Download Results:** Enriched CSV with personalized content
+
+### API Endpoints
+
+- `POST /api/v1/jobs/upload` - Upload CSV and start enrichment
+- `GET /api/v1/jobs/{id}` - Check job status and progress
+- `POST /api/v1/mapping/analyze` - Analyze CSV columns for mapping
+- `GET /api/v1/health` - System health check
+
+### Extending the Platform
+
+* **Custom Industries:** Modify prompts and search terms for different business types
+* **Additional Data Sources:** Integrate social media, review sites, or business directories
+* **Advanced Personalization:** Add A/B testing, sentiment analysis, or demographic targeting
+* **CRM Integration:** Connect to Salesforce, HubSpot, or other marketing platforms
+* **Multi-channel Content:** Generate SMS, social media, or direct mail content
 
 ## License
 

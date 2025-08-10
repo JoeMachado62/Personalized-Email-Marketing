@@ -26,10 +26,13 @@ python test_installation.py
 python run_server.py
 ```
 
-The API will be available at:
+The application will be available at:
 - **API Base**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 - **Health Check**: http://localhost:8000/api/v1/health
+- **Web Interface**: http://localhost:8000/static/unified.html
+- **Simple Upload**: http://localhost:8000/static/test.html
+- **Column Mapper**: http://localhost:8000/static/mapper.html
 
 ## Manual Setup
 
@@ -85,7 +88,9 @@ outputs/                 # Generated result files
 |----------|-------------|---------|
 | `LLM_API_KEY` | OpenAI API key | Required |
 | `LLM_PROVIDER` | LLM provider | `openai` |
-| `LLM_MODEL` | Model name | `gpt-4o-mini` |
+| `LLM_MODEL` | Model name | `gpt-5-mini-2025-08-07` |
+| `ENABLE_MCP_FETCH` | Enable MCP Fetch for web scraping | `true` |
+| `SEARCH_PROVIDER` | Search engine provider | `selenium` |
 | `MAX_FILE_SIZE_MB` | Max upload size | `10` |
 | `MAX_RECORDS_PER_JOB` | Max records per job | `10000` |
 | `MAX_CONCURRENT_ENRICHMENTS` | Parallel processing limit | `3` |

@@ -1,73 +1,85 @@
 @echo off
-echo Gracefully stopping AI Sales Agent Server...
+echo Forcefully stopping AI Sales Agent Server and clearing ports...
 echo ==========================================
+echo.
 
-:: Find the running uvicorn process
+echo Step 1: Killing processes on port 8000 (Backend API)...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :8000') do (
+    echo   Found process %%a on port 8000
+    taskkill /PID %%a /F 2>nul
+    if %ERRORLEVEL% EQU 0 (
+        echo   Successfully killed process %%a
+    ) else (
+        echo   Process %%a already terminated or access denied
+    )
+)
+
+echo.
+echo Step 2: Killing processes on port 3000 (Frontend Server)...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr :3000') do (
+    echo   Found process %%a on port 3000
+    taskkill /PID %%a /F 2>nul
+    if %ERRORLEVEL% EQU 0 (
+        echo   Successfully killed process %%a
+    ) else (
+        echo   Process %%a already terminated or access denied
+    )
+)
+
+echo.
+echo Step 3: Killing any Python/uvicorn processes...
+:: Kill any uvicorn processes
 for /f "tokens=2" %%i in ('tasklist /fi "imagename eq python.exe" /fo table ^| findstr uvicorn') do (
-    set PID=%%i
-    goto :found
+    echo   Found Python process %%i running uvicorn
+    taskkill /PID %%i /F /T 2>nul
 )
 
-:: Alternative: look for any python process running app.main
-for /f "tokens=2" %%i in ('wmic process where "name='python.exe' and CommandLine like '%%app.main%%'" get ProcessId /value ^| findstr ProcessId') do (
-    set PID=%%i
-    if defined PID goto :found
+:: Kill any python processes with app.main
+for /f "tokens=2" %%i in ('wmic process where "name='python.exe' and CommandLine like '%%app.main%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do (
+    for /f "tokens=2 delims==" %%j in ("%%i") do (
+        echo   Found Python process %%j running app.main
+        taskkill /PID %%j /F /T 2>nul
+    )
 )
 
-echo No running server process found.
-echo.
-echo Possible reasons:
-echo - Server is not currently running
-echo - Server was started differently (not via start_server.bat)
-echo - Process is running under a different name
-echo.
-echo To manually check for running processes:
-echo   tasklist ^| findstr python
-echo.
-pause
-exit /b 1
-
-:found
-if not defined PID (
-    echo No server process found to stop.
-    pause
-    exit /b 1
+:: Kill any python HTTP server processes on port 3000
+for /f "tokens=2" %%i in ('wmic process where "name='python.exe' and CommandLine like '%%http.server%%3000%%'" get ProcessId /value 2^>nul ^| findstr ProcessId') do (
+    for /f "tokens=2 delims==" %%j in ("%%i") do (
+        echo   Found Python HTTP server process %%j
+        taskkill /PID %%j /F /T 2>nul
+    )
 )
 
-echo Found server process with PID: %PID%
-echo Sending graceful termination signal...
+echo.
+echo Waiting for ports to be released...
+timeout /t 2 /nobreak > nul
 
-:: Send CTRL+C signal to gracefully shutdown
-taskkill /PID %PID% /T
-
-:: Wait a moment for graceful shutdown
-echo Waiting for graceful shutdown...
-timeout /t 3 /nobreak > nul
-
-:: Check if process is still running
-tasklist /FI "PID eq %PID%" 2>nul | find /I "%PID%" >nul
-if %ERRORLEVEL% EQU 0 (
-    echo Process still running, forcing termination...
-    taskkill /PID %PID% /F /T
-    timeout /t 1 /nobreak > nul
+echo.
+echo Verifying ports are clear...
+netstat -ano | findstr :8000 >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo   [OK] Port 8000 is now free (Backend API)
 ) else (
-    echo Server stopped gracefully.
+    echo   [WARNING] Port 8000 may still be in use
+    echo   You may need to manually kill the process or wait a moment
 )
 
-:: Final verification
-tasklist /FI "PID eq %PID%" 2>nul | find /I "%PID%" >nul
-if %ERRORLEVEL% EQU 0 (
-    echo Warning: Process may still be running. Manual intervention may be required.
+netstat -ano | findstr :3000 >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo   [OK] Port 3000 is now free (Frontend Server)
 ) else (
-    echo Server successfully stopped.
-    echo.
-    echo Your data has been preserved:
-    echo - Database: data/app.db
-    echo - Uploads: uploads/ directory  
-    echo - Outputs: outputs/ directory
-    echo - Logs: app.log
+    echo   [WARNING] Port 3000 may still be in use
+    echo   You may need to manually kill the process or wait a moment
 )
 
+echo.
+echo Server stopping process complete.
+echo.
+echo Your data has been preserved:
+echo - Database: data/app.db
+echo - Uploads: uploads/ directory  
+echo - Outputs: outputs/ directory
+echo - Logs: app.log
 echo.
 echo ==========================================
 pause

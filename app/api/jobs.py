@@ -20,6 +20,7 @@ from app.models.job import (
 )
 from app.db.connection import JobService, get_db
 from app.config import settings
+from app.services.job_processor import process_job
 import logging
 
 logger = logging.getLogger(__name__)
@@ -200,7 +201,7 @@ async def create_job(
         logger.info(f"Created job {job_id} with {len(df)} records")
         
         # Start processing in background
-        from app.services.job_processor import process_job
+        # Import moved to module level to avoid import issues
         asyncio.create_task(process_job(job_id))
         logger.info(f"Started background processing for job {job_id}")
         

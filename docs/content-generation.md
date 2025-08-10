@@ -1,14 +1,22 @@
 # Content Generation & Personalization
 
 ## Overview
-This document details the AI-powered content generation system that creates personalized marketing materials based on enriched business profiles.
+This document details the AI-powered content generation system that creates personalized marketing materials based on enriched business profiles gathered through our current Selenium + MCP Fetch architecture.
 
 ## Content Generation Pipeline
 
+### Current Implementation: Selenium + MCP → AI Content
+The content generation process leverages high-quality data from our working pipeline:
+
+1. **Selenium Search** → Clean search results with real Chrome browser
+2. **MCP Fetch Processing** → HTML pages converted to clean Markdown
+3. **AI Content Generation** → Personalized emails based on structured data
+
 ### Core Components
-- **DataInterpreter** (`auto_enrich/data_interpreter.py`): Generates initial content
-- **Content Templates**: Structured prompts for different content types
-- **Personalization Engine**: Adapts content to profile characteristics
+- **DataInterpreter** (`auto_enrich/data_interpreter.py`): Generates initial content from MCP-processed data
+- **Content Templates**: Structured prompts optimized for Markdown input
+- **Personalization Engine**: Adapts content using Selenium + MCP profile characteristics
+- **MCP Integration**: Leverages clean, structured content for better AI outputs
 
 ## Content Types
 

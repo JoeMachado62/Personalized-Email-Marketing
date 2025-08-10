@@ -8,7 +8,13 @@
       "Bash(curl:*)",
       "Bash(cp:*)",
       "Bash(pkill:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "WebFetch(domain:pypi.org)",
+      "WebFetch(domain:www.scrapehero.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:www.zenrows.com)",
+      "WebFetch(domain:dev.to)",
+      "Bash(git add:*)"
     ],
     "deny": []
   }
