@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Sales Agent - Job History</title>
+    <link rel="stylesheet" href="../app/static/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-title">AI Sales Agent</h1>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link">Upload</a>
+                <a href="status.html" class="nav-link">Status</a>
+                <a href="history.html" class="nav-link active">History</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="history-header">
+            <h2>Job History</h2>
+            <div class="header-controls">
+                <div class="search-container">
+                    <input type="text" id="searchInput" placeholder="Search jobs by ID or status...">
+                    <button class="search-btn" id="searchBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="M21 21l-4.35-4.35"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="filter-controls">
+                    <select id="statusFilter">
+                        <option value="">All Status</option>
+                        <option value="pending">Pending</option>
+                        <option value="processing">Processing</option>
+                        <option value="completed">Completed</option>
+                        <option value="failed">Failed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
+                    <select id="dateFilter">
+                        <option value="">All Dates</option>
+                        <option value="today">Today</option>
+                        <option value="week">This Week</option>
+                        <option value="month">This Month</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="statistics-section">
+            <div class="stat-cards">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalJobs">-</div>
+                    <div class="stat-label">Total Jobs</div>
+                    <div class="stat-trend" id="totalJobsTrend"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="completedJobs">-</div>
+                    <div class="stat-label">Completed</div>
+                    <div class="stat-trend" id="completedJobsTrend"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalRecords">-</div>
+                    <div class="stat-label">Records Processed</div>
+                    <div class="stat-trend" id="totalRecordsTrend"></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="successRate">-</div>
+                    <div class="stat-label">Success Rate</div>
+                    <div class="stat-trend" id="successRateTrend"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="history-controls">
+            <div class="view-controls">
+                <button class="view-btn active" data-view="grid" id="gridViewBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Grid
+                </button>
+                <button class="view-btn" data-view="table" id="tableViewBtn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 3h6v18H9z"></path>
+                        <path d="M3 9h18v6H3z"></path>
+                    </svg>
+                    Table
+                </button>
+            </div>
+            
+            <div class="sort-controls">
+                <select id="sortBy">
+                    <option value="created_at">Date Created</option>
+                    <option value="status">Status</option>
+                    <option value="total_records">Record Count</option>
+                    <option value="processing_time">Processing Time</option>
+                </select>
+                <button class="sort-order-btn" id="sortOrderBtn" data-order="desc">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 5v14M19 12l-7 7-7-7"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div class="jobs-container">
+            <!-- Grid View -->
+            <div class="jobs-grid-view" id="jobsGridView">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Loading job history...</p>
+                </div>
+            </div>
+
+            <!-- Table View -->
+            <div class="jobs-table-view" id="jobsTableView" style="display: none;">
+                <div class="table-container">
+                    <table class="jobs-table">
+                        <thead>
+                            <tr>
+                                <th>Job ID</th>
+                                <th>Status</th>
+                                <th>Records</th>
+                                <th>Processed</th>
+                                <th>Failed</th>
+                                <th>Created</th>
+                                <th>Duration</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="jobsTableBody">
+                            <!-- Jobs will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="pagination" id="pagination" style="display: none;">
+            <button class="page-btn" id="prevPageBtn">Previous</button>
+            <div class="page-numbers" id="pageNumbers"></div>
+            <button class="page-btn" id="nextPageBtn">Next</button>
+        </div>
+
+        <div class="bulk-actions" id="bulkActions" style="display: none;">
+            <div class="bulk-header">
+                <span id="selectedCount">0</span> jobs selected
+            </div>
+            <div class="bulk-buttons">
+                <button class="btn btn-secondary" id="bulkDownloadBtn">Download All</button>
+                <button class="btn btn-danger" id="bulkDeleteBtn">Delete Selected</button>
+            </div>
+        </div>
+
+        <!-- Job Detail Modal -->
+        <div class="modal" id="jobDetailModal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Job Details</h3>
+                    <button class="modal-close" id="closeModal">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body" id="modalBody">
+                    <!-- Job details will be populated here -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="modalCloseBtn">Close</button>
+                    <button class="btn btn-success" id="modalDownloadBtn" style="display: none;">Download</button>
+                    <button class="btn btn-primary" id="modalViewStatusBtn">View Status</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert" id="alertMessage" style="display: none;">
+            <div class="alert-content">
+                <div class="alert-icon" id="alertIcon"></div>
+                <div class="alert-text" id="alertText"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentJobs = [];
+        let filteredJobs = [];
+        let currentPage = 1;
+        let itemsPerPage = 20;
+        let selectedJobs = new Set();
+        let currentView = 'grid';
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadJobHistory();
+            loadStatistics();
+
+            // Event listeners
+            document.getElementById('searchBtn').addEventListener('click', performSearch);
+            document.getElementById('searchInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') performSearch();
+            });
+
+            document.getElementById('statusFilter').addEventListener('change', applyFilters);
+            document.getElementById('dateFilter').addEventListener('change', applyFilters);
+            document.getElementById('sortBy').addEventListener('change', applySorting);
+            document.getElementById('sortOrderBtn').addEventListener('click', toggleSortOrder);
+
+            document.getElementById('gridViewBtn').addEventListener('click', () => switchView('grid'));
+            document.getElementById('tableViewBtn').addEventListener('click', () => switchView('table'));
+
+            document.getElementById('prevPageBtn').addEventListener('click', () => changePage(currentPage - 1));
+            document.getElementById('nextPageBtn').addEventListener('click', () => changePage(currentPage + 1));
+
+            document.getElementById('bulkDownloadBtn').addEventListener('click', bulkDownload);
+            document.getElementById('bulkDeleteBtn').addEventListener('click', bulkDelete);
+
+            document.getElementById('closeModal').addEventListener('click', closeModal);
+            document.getElementById('modalCloseBtn').addEventListener('click', closeModal);
+            document.getElementById('modalViewStatusBtn').addEventListener('click', viewJobStatus);
+            document.getElementById('modalDownloadBtn').addEventListener('click', downloadFromModal);
+        });
+
+        async function loadJobHistory() {
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/jobs?limit=100');
+                if (response.ok) {
+                    currentJobs = await response.json();
+                    filteredJobs = [...currentJobs];
+                    displayJobs();
+                    updatePagination();
+                } else {
+                    showError('Failed to load job history');
+                }
+            } catch (error) {
+                showError('Error loading jobs: ' + error.message);
+            }
+        }
+
+        async function loadStatistics() {
+            try {
+                const response = await fetch('http://localhost:8000/api/v1/jobs/statistics');
+                if (response.ok) {
+                    const stats = await response.json();
+                    updateStatistics(stats);
+                } else {
+                    // Calculate basic stats from current jobs if API doesn't exist
+                    calculateBasicStats();
+                }
+            } catch (error) {
+                calculateBasicStats();
+            }
+        }
+
+        function calculateBasicStats() {
+            const total = currentJobs.length;
+            const completed = currentJobs.filter(job => job.status === 'completed').length;
+            const totalRecords = currentJobs.reduce((sum, job) => sum + (job.total_records || 0), 0);
+            const successRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+            updateStatistics({
+                total_jobs: total,
+                completed_jobs: completed,
+                total_records: totalRecords,
+                success_rate: successRate
+            });
+        }
+
+        function updateStatistics(stats) {
+            document.getElementById('totalJobs').textContent = stats.total_jobs || 0;
+            document.getElementById('completedJobs').textContent = stats.completed_jobs || 0;
+            document.getElementById('totalRecords').textContent = stats.total_records || 0;
+            document.getElementById('successRate').textContent = (stats.success_rate || 0) + '%';
+        }
+
+        function displayJobs() {
+            const startIndex = (currentPage - 1) * itemsPerPage;
+            const endIndex = startIndex + itemsPerPage;
+            const pageJobs = filteredJobs.slice(startIndex, endIndex);
+
+            if (currentView === 'grid') {
+                displayGridView(pageJobs);
+            } else {
+                displayTableView(pageJobs);
+            }
+        }
+
+        function displayGridView(jobs) {
+            const container = document.getElementById('jobsGridView');
+            
+            if (jobs.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No jobs found matching your criteria</p></div>';
+                return;
+            }
+
+            container.innerHTML = jobs.map(job => `
+                <div class="job-card history-card" data-job-id="${job.job_id}">
+                    <div class="card-header">
+                        <div class="job-checkbox">
+                            <input type="checkbox" onchange="toggleJobSelection('${job.job_id}')">
+                        </div>
+                        <div class="job-id">${job.job_id.substring(0, 8)}...</div>
+                        <div class="status-badge ${job.status}">${job.status}</div>
+                    </div>
+                    
+                    <div class="job-metrics-grid">
+                        <div class="metric-item">
+                            <span class="metric-value">${job.total_records || 0}</span>
+                            <span class="metric-label">Records</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-value">${job.processed_records || 0}</span>
+                            <span class="metric-label">Processed</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-value">${job.failed_records || 0}</span>
+                            <span class="metric-label">Failed</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-value">${calculateDuration(job)}</span>
+                            <span class="metric-label">Duration</span>
+                        </div>
+                    </div>
+
+                    <div class="job-timestamps">
+                        <div class="timestamp">
+                            <span class="timestamp-label">Created:</span>
+                            <span class="timestamp-value">${formatDate(job.created_at)}</span>
+                        </div>
+                        ${job.completed_at ? `
+                            <div class="timestamp">
+                                <span class="timestamp-label">Completed:</span>
+                                <span class="timestamp-value">${formatDate(job.completed_at)}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="job-actions">
+                        <button class="btn btn-sm btn-secondary" onclick="viewJobDetails('${job.job_id}')">Details</button>
+                        ${job.status === 'completed' ? 
+                            `<button class="btn btn-sm btn-success" onclick="downloadJob('${job.job_id}')">Download</button>` : 
+                            `<button class="btn btn-sm btn-primary" onclick="viewJobStatus('${job.job_id}')">View Status</button>`
+                        }
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function displayTableView(jobs) {
+            const tbody = document.getElementById('jobsTableBody');
+            
+            if (jobs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty-cell">No jobs found matching your criteria</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = jobs.map(job => `
+                <tr data-job-id="${job.job_id}">
+                    <td>
+                        <input type="checkbox" onchange="toggleJobSelection('${job.job_id}')">
+                        <span class="job-id-cell">${job.job_id.substring(0, 8)}...</span>
+                    </td>
+                    <td><span class="status-badge ${job.status}">${job.status}</span></td>
+                    <td>${job.total_records || 0}</td>
+                    <td>${job.processed_records || 0}</td>
+                    <td>${job.failed_records || 0}</td>
+                    <td>${formatDate(job.created_at)}</td>
+                    <td>${calculateDuration(job)}</td>
+                    <td class="actions-cell">
+                        <button class="btn btn-sm btn-secondary" onclick="viewJobDetails('${job.job_id}')">Details</button>
+                        ${job.status === 'completed' ? 
+                            `<button class="btn btn-sm btn-success" onclick="downloadJob('${job.job_id}')">Download</button>` : 
+                            `<button class="btn btn-sm btn-primary" onclick="viewJobStatus('${job.job_id}')">Status</button>`
+                        }
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function performSearch() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            if (query === '') {
+                filteredJobs = [...currentJobs];
+            } else {
+                filteredJobs = currentJobs.filter(job => 
+                    job.job_id.toLowerCase().includes(query) ||
+                    job.status.toLowerCase().includes(query)
+                );
+            }
+            currentPage = 1;
+            displayJobs();
+            updatePagination();
+        }
+
+        function applyFilters() {
+            const statusFilter = document.getElementById('statusFilter').value;
+            const dateFilter = document.getElementById('dateFilter').value;
+
+            filteredJobs = currentJobs.filter(job => {
+                // Status filter
+                if (statusFilter && job.status !== statusFilter) {
+                    return false;
+                }
+
+                // Date filter
+                if (dateFilter) {
+                    const jobDate = new Date(job.created_at);
+                    const now = new Date();
+                    
+                    switch (dateFilter) {
+                        case 'today':
+                            if (jobDate.toDateString() !== now.toDateString()) return false;
+                            break;
+                        case 'week':
+                            const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+                            if (jobDate < weekAgo) return false;
+                            break;
+                        case 'month':
+                            const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                            if (jobDate < monthAgo) return false;
+                            break;
+                    }
+                }
+
+                return true;
+            });
+
+            currentPage = 1;
+            displayJobs();
+            updatePagination();
+        }
+
+        function applySorting() {
+            const sortBy = document.getElementById('sortBy').value;
+            const order = document.getElementById('sortOrderBtn').dataset.order;
+
+            filteredJobs.sort((a, b) => {
+                let valueA = a[sortBy];
+                let valueB = b[sortBy];
+
+                if (sortBy === 'created_at' || sortBy === 'completed_at') {
+                    valueA = new Date(valueA);
+                    valueB = new Date(valueB);
+                } else if (typeof valueA === 'string') {
+                    valueA = valueA.toLowerCase();
+                    valueB = valueB.toLowerCase();
+                }
+
+                if (order === 'desc') {
+                    return valueB > valueA ? 1 : -1;
+                } else {
+                    return valueA > valueB ? 1 : -1;
+                }
+            });
+
+            displayJobs();
+        }
+
+        function toggleSortOrder() {
+            const btn = document.getElementById('sortOrderBtn');
+            const currentOrder = btn.dataset.order;
+            btn.dataset.order = currentOrder === 'desc' ? 'asc' : 'desc';
+            
+            // Update button icon
+            const svg = btn.querySelector('svg path');
+            if (btn.dataset.order === 'asc') {
+                svg.setAttribute('d', 'M12 19V5M5 12l7-7 7 7');
+            } else {
+                svg.setAttribute('d', 'M12 5v14M19 12l-7 7-7-7');
+            }
+            
+            applySorting();
+        }
+
+        function switchView(view) {
+            currentView = view;
+            
+            // Update button states
+            document.querySelectorAll('.view-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(view + 'ViewBtn').classList.add('active');
+
+            // Show/hide views
+            document.getElementById('jobsGridView').style.display = view === 'grid' ? 'block' : 'none';
+            document.getElementById('jobsTableView').style.display = view === 'table' ? 'block' : 'none';
+
+            displayJobs();
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
+            const pagination = document.getElementById('pagination');
+            
+            if (totalPages <= 1) {
+                pagination.style.display = 'none';
+                return;
+            }
+
+            pagination.style.display = 'flex';
+            
+            // Update buttons
+            document.getElementById('prevPageBtn').disabled = currentPage === 1;
+            document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
+
+            // Update page numbers
+            const pageNumbers = document.getElementById('pageNumbers');
+            pageNumbers.innerHTML = '';
+            
+            for (let i = Math.max(1, currentPage - 2); i <= Math.min(totalPages, currentPage + 2); i++) {
+                const btn = document.createElement('button');
+                btn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+                btn.textContent = i;
+                btn.onclick = () => changePage(i);
+                pageNumbers.appendChild(btn);
+            }
+        }
+
+        function changePage(page) {
+            const totalPages = Math.ceil(filteredJobs.length / itemsPerPage);
+            if (page < 1 || page > totalPages) return;
+            
+            currentPage = page;
+            displayJobs();
+            updatePagination();
+        }
+
+        function toggleJobSelection(jobId) {
+            if (selectedJobs.has(jobId)) {
+                selectedJobs.delete(jobId);
+            } else {
+                selectedJobs.add(jobId);
+            }
+            
+            updateBulkActions();
+        }
+
+        function updateBulkActions() {
+            const bulkActions = document.getElementById('bulkActions');
+            const selectedCount = document.getElementById('selectedCount');
+            
+            if (selectedJobs.size > 0) {
+                bulkActions.style.display = 'flex';
+                selectedCount.textContent = selectedJobs.size;
+            } else {
+                bulkActions.style.display = 'none';
+            }
+        }
+
+        function viewJobDetails(jobId) {
+            const job = currentJobs.find(j => j.job_id === jobId);
+            if (!job) return;
+
+            const modal = document.getElementById('jobDetailModal');
+            const modalBody = document.getElementById('modalBody');
+            const downloadBtn = document.getElementById('modalDownloadBtn');
+
+            modalBody.innerHTML = `
+                <div class="job-detail-content">
+                    <div class="detail-section">
+                        <h4>Job Information</h4>
+                        <div class="detail-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Job ID:</span>
+                                <span class="detail-value">${job.job_id}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Status:</span>
+                                <span class="status-badge ${job.status}">${job.status}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Created:</span>
+                                <span class="detail-value">${formatDateTime(job.created_at)}</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Duration:</span>
+                                <span class="detail-value">${calculateDuration(job)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-section">
+                        <h4>Processing Statistics</h4>
+                        <div class="stats-grid">
+                            <div class="stat-box">
+                                <div class="stat-number">${job.total_records || 0}</div>
+                                <div class="stat-desc">Total Records</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number">${job.processed_records || 0}</div>
+                                <div class="stat-desc">Processed</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number">${job.failed_records || 0}</div>
+                                <div class="stat-desc">Failed</div>
+                            </div>
+                            <div class="stat-box">
+                                <div class="stat-number">${job.total_records ? Math.round(((job.processed_records || 0) / job.total_records) * 100) : 0}%</div>
+                                <div class="stat-desc">Success Rate</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    ${job.error ? `
+                        <div class="detail-section">
+                            <h4>Error Information</h4>
+                            <div class="error-box">
+                                ${job.error}
+                            </div>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+
+            // Show/hide download button
+            if (job.status === 'completed') {
+                downloadBtn.style.display = 'inline-block';
+                downloadBtn.onclick = () => downloadJob(jobId);
+            } else {
+                downloadBtn.style.display = 'none';
+            }
+
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('jobDetailModal').style.display = 'none';
+        }
+
+        function viewJobStatus(jobId) {
+            window.open(`status.html?job=${jobId}`, '_blank');
+        }
+
+        function downloadJob(jobId) {
+            const link = document.createElement('a');
+            link.href = `http://localhost:8000/api/v1/jobs/${jobId}/download`;
+            link.download = `enriched_${jobId}.csv`;
+            link.click();
+        }
+
+        function downloadFromModal() {
+            const jobId = document.getElementById('modalBody').querySelector('.detail-value').textContent;
+            downloadJob(jobId);
+        }
+
+        async function bulkDownload() {
+            if (selectedJobs.size === 0) return;
+            
+            for (const jobId of selectedJobs) {
+                const job = currentJobs.find(j => j.job_id === jobId);
+                if (job && job.status === 'completed') {
+                    downloadJob(jobId);
+                    // Add small delay between downloads
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+        }
+
+        async function bulkDelete() {
+            if (selectedJobs.size === 0) return;
+            
+            if (confirm(`Are you sure you want to delete ${selectedJobs.size} selected jobs?`)) {
+                try {
+                    const deletePromises = Array.from(selectedJobs).map(jobId =>
+                        fetch(`http://localhost:8000/api/v1/jobs/${jobId}`, { method: 'DELETE' })
+                    );
+                    
+                    await Promise.all(deletePromises);
+                    
+                    showAlert(`${selectedJobs.size} jobs deleted successfully`, 'success');
+                    selectedJobs.clear();
+                    updateBulkActions();
+                    loadJobHistory();
+                } catch (error) {
+                    showAlert('Error deleting jobs: ' + error.message, 'error');
+                }
+            }
+        }
+
+        // Utility functions
+        function formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleDateString();
+        }
+
+        function formatDateTime(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+
+        function calculateDuration(job) {
+            if (!job.created_at) return '-';
+            
+            const start = new Date(job.created_at);
+            const end = job.completed_at ? new Date(job.completed_at) : new Date();
+            const duration = Math.round((end - start) / 1000); // seconds
+            
+            if (duration < 60) return `${duration}s`;
+            if (duration < 3600) return `${Math.round(duration / 60)}m`;
+            return `${Math.round(duration / 3600)}h`;
+        }
+
+        function showError(message) {
+            document.getElementById('jobsGridView').innerHTML = `<div class="error-state"><p>${message}</p></div>`;
+        }
+
+        function showAlert(message, type) {
+            const alert = document.getElementById('alertMessage');
+            const alertText = document.getElementById('alertText');
+            
+            alertText.textContent = message;
+            alert.className = `alert ${type}`;
+            alert.style.display = 'block';
+            
+            setTimeout(() => {
+                alert.style.display = 'none';
+            }, 5000);
+        }
+
+        // Modal click outside to close
+        window.addEventListener('click', function(e) {
+            const modal = document.getElementById('jobDetailModal');
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+    </script>
+
+    <script src="../app/static/app.js"></script>
+</body>
+</html>

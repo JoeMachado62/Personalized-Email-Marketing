@@ -1,0 +1,37 @@
+# Core dependencies for the auto_enrich application
+python-dotenv>=1.0
+httpx>=0.24
+pandas>=2.0
+playwright>=1.39
+
+# FastAPI and web server dependencies
+fastapi>=0.110.0
+uvicorn[standard]>=0.20.0
+python-multipart>=0.0.6  # Required for file uploads
+aiofiles>=23.0.0  # For async file operations
+
+# Pydantic settings management
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+
+# Database and data processing
+# sqlite3 is built into Python standard library
+
+# Additional utility dependencies
+python-json-logger>=2.0.0  # Enhanced logging capabilities
+
+# LLM Provider SDKs
+openai>=1.0.0  # For OpenAI GPT models
+anthropic>=0.3.0  # For Anthropic Claude models (optional)
+
+# Enhanced LLM service dependencies
+# Additional built-in dependencies used:
+# - asyncio: Built into Python
+# - dataclasses: Built into Python 3.7+
+# - enum: Built into Python
+# - typing: Built into Python
+
+# The Playwright package requires installing browser binaries after
+# installation. Run `playwright install` once.
+
+# For asynchronous task scheduling (optional, used implicitly via asyncio)

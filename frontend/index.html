@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Sales Agent - Upload</title>
+    <link rel="stylesheet" href="../app/static/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-title">AI Sales Agent</h1>
+            <div class="nav-links">
+                <a href="index.html" class="nav-link active">Upload</a>
+                <a href="status.html" class="nav-link">Status</a>
+                <a href="history.html" class="nav-link">History</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="upload-card">
+            <div class="card-header">
+                <h2>Upload Your CSV File</h2>
+                <p>Transform your contact list with AI-powered enrichment</p>
+            </div>
+
+            <div class="upload-section">
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <h3>Drop your CSV here</h3>
+                    <p>or <span class="upload-link">click to browse</span></p>
+                    <div class="file-requirements">
+                        <p>• CSV format only</p>
+                        <p>• Maximum 10MB file size</p>
+                        <p>• Required columns: Company Name, Address, Phone</p>
+                    </div>
+                    <input type="file" id="fileInput" accept=".csv" style="display: none;">
+                </div>
+
+                <div class="file-preview" id="filePreview" style="display: none;">
+                    <div class="file-info">
+                        <div class="file-icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14,2 L6,2 C4.9,2 4,2.9 4,4 L4,20 C4,21.1 4.9,22 6,22 L18,22 C19.1,22 20,21.1 20,20 L20,8 L14,2 Z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                            </svg>
+                        </div>
+                        <div class="file-details">
+                            <div class="file-name" id="fileName"></div>
+                            <div class="file-size" id="fileSize"></div>
+                        </div>
+                        <button class="remove-file" id="removeFile">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="upload-actions">
+                    <button class="btn btn-primary" id="uploadBtn" disabled>
+                        <span class="btn-text">Start Enrichment</span>
+                        <div class="spinner" style="display: none;"></div>
+                    </button>
+                </div>
+            </div>
+
+            <div class="status-section" id="statusSection" style="display: none;">
+                <div class="status-header">
+                    <h3>Processing Status</h3>
+                    <div class="status-badge" id="statusBadge">Processing</div>
+                </div>
+                
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="progress-text">
+                        <span id="progressPercentage">0%</span>
+                        <span id="progressDetails">Preparing...</span>
+                    </div>
+                </div>
+
+                <div class="status-details">
+                    <div class="detail-item">
+                        <span class="detail-label">Job ID:</span>
+                        <span class="detail-value" id="jobId">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Records:</span>
+                        <span class="detail-value" id="recordCount">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Processed:</span>
+                        <span class="detail-value" id="processedCount">-</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">Estimated Time:</span>
+                        <span class="detail-value" id="estimatedTime">-</span>
+                    </div>
+                </div>
+
+                <div class="action-buttons" id="actionButtons" style="display: none;">
+                    <button class="btn btn-success" id="downloadBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download Results
+                    </button>
+                    <button class="btn btn-secondary" id="viewStatusBtn">View Full Status</button>
+                </div>
+            </div>
+
+            <div class="alert" id="alertMessage" style="display: none;">
+                <div class="alert-content">
+                    <div class="alert-icon" id="alertIcon"></div>
+                    <div class="alert-text" id="alertText"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-section">
+            <div class="info-card">
+                <h3>What We Do</h3>
+                <ul>
+                    <li>Find company websites automatically</li>
+                    <li>Extract contact information</li>
+                    <li>Generate personalized email content</li>
+                    <li>Create compelling subject lines</li>
+                </ul>
+            </div>
+            
+            <div class="info-card">
+                <h3>CSV Format Requirements</h3>
+                <p>Your CSV file must include these columns:</p>
+                <div class="column-list">
+                    <span class="column-required">Company Name</span>
+                    <span class="column-required">Address</span>
+                    <span class="column-required">Phone</span>
+                </div>
+                <p class="info-note">Additional columns will be preserved in the output.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="../app/static/app.js"></script>
+</body>
+</html>

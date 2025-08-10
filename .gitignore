@@ -1,0 +1,20 @@
+# Ignore the Windows reserved filename that breaks Git
+nul
+
+# Ignore environment and secrets
+.env
+.env.*
+
+# Ignore log files
+*.log
+
+# Ignore Python cache
+__pycache__/
+*.pyc
+
+# Ignore uploads and local data
+uploads/
+data/
+
+# Ignore VS Code workspace settings
+.vscode/
