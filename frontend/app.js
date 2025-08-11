@@ -5,7 +5,7 @@
 
 // Global configuration
 const CONFIG = {
-    API_BASE_URL: 'http://localhost:8000',
+    API_BASE_URL: 'http://localhost:8001',
     MAX_FILE_SIZE_MB: 10,
     POLL_INTERVAL_MS: 2000,
     MAX_RETRIES: 3,

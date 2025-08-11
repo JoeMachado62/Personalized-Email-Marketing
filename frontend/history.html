@@ -230,7 +230,7 @@
 
         async function loadJobHistory() {
             try {
-                const response = await fetch('http://localhost:8000/api/v1/jobs?limit=100');
+                const response = await fetch('http://localhost:8001/api/v1/jobs?limit=100');
                 if (response.ok) {
                     currentJobs = await response.json();
                     filteredJobs = [...currentJobs];
@@ -246,7 +246,7 @@
 
         async function loadStatistics() {
             try {
-                const response = await fetch('http://localhost:8000/api/v1/jobs/statistics');
+                const response = await fetch('http://localhost:8001/api/v1/jobs/statistics');
                 if (response.ok) {
                     const stats = await response.json();
                     updateStatistics(stats);
@@ -638,7 +638,7 @@
 
         function downloadJob(jobId) {
             const link = document.createElement('a');
-            link.href = `http://localhost:8000/api/v1/jobs/${jobId}/download`;
+            link.href = `http://localhost:8001/api/v1/jobs/${jobId}/download`;
             link.download = `enriched_${jobId}.csv`;
             link.click();
         }
@@ -667,7 +667,7 @@
             if (confirm(`Are you sure you want to delete ${selectedJobs.size} selected jobs?`)) {
                 try {
                     const deletePromises = Array.from(selectedJobs).map(jobId =>
-                        fetch(`http://localhost:8000/api/v1/jobs/${jobId}`, { method: 'DELETE' })
+                        fetch(`http://localhost:8001/api/v1/jobs/${jobId}`, { method: 'DELETE' })
                     );
                     
                     await Promise.all(deletePromises);

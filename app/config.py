@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     MAX_RECORDS_PER_JOB: int = 100000  # Increased to handle larger datasets
     
     # CORS
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:8000"
+    ALLOWED_ORIGINS: str = "http://localhost:3001,http://localhost:8001"
     
     # Paths
     UPLOAD_DIR: Path = Path("./uploads")

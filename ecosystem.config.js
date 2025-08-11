@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'ai-sales-backend',
       script: 'python3',
-      args: '-m uvicorn app.main:app --host 0.0.0.0 --port 8000',
+      args: '-m uvicorn app.main:app --host 0.0.0.0 --port 8001',
       cwd: './',
       env: {
         SERPER_API_KEY: process.env.SERPER_API_KEY || 'YOUR_SERPER_API_KEY',
@@ -22,7 +22,7 @@ module.exports = {
     {
       name: 'ai-sales-frontend',
       script: 'python3',
-      args: '-m http.server 3000',
+      args: '-m http.server 3001',
       cwd: './frontend',
       error_file: '../logs/frontend-error.log',
       out_file: '../logs/frontend-out.log',

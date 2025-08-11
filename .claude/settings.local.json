@@ -18,7 +18,14 @@
       "Bash(git commit:*)",
       "Bash(dir test_screenshot.png)",
       "Bash(dir:*)",
-      "WebFetch(domain:docs.seraphnet.ai)"
+      "WebFetch(domain:docs.seraphnet.ai)",
+      "Bash(npm search:*)",
+      "Bash(npm init:*)",
+      "Bash(npm install:*)",
+      "Bash(grep:*)",
+      "Bash(kill:*)",
+      "Bash(chmod:*)",
+      "Bash(source:*)"
     ],
     "deny": []
   }

@@ -8,9 +8,12 @@ echo "     AI Sales Agent - Full Enrichment Mode (Linux)"
 echo "================================================================"
 echo ""
 
+# Activate virtual environment first
+source venv/bin/activate
+
 # Load environment variables from .env file
 if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+    export $(cat .env | grep -v '^#' | grep '=' | xargs)
 fi
 
 # Check for required API keys
@@ -46,23 +49,23 @@ echo ""
 # Kill any existing servers
 echo "Stopping any existing servers..."
 pkill -f "uvicorn app.main:app" 2>/dev/null
-pkill -f "python3 -m http.server 3000" 2>/dev/null
+pkill -f "python3 -m http.server 3001" 2>/dev/null
 sleep 2
 
 # Start frontend server in background
-echo "Starting frontend server on port 3000..."
-cd frontend && python3 -m http.server 3000 &
+echo "Starting frontend server on port 3001..."
+cd frontend && python3 -m http.server 3001 &
 FRONTEND_PID=$!
 cd ..
 echo "  ✓ Frontend server started (PID: $FRONTEND_PID)"
 
 # Start backend server
-echo "Starting backend server on port 8000..."
+echo "Starting backend server on port 8001..."
 echo ""
 echo "================================================================"
 echo "Server URLs:"
-echo "  - Frontend: http://localhost:3000/unified.html"
-echo "  - API Docs: http://localhost:8000/docs"
+echo "  - Frontend: http://localhost:3001/unified.html"
+echo "  - API Docs: http://localhost:8001/docs"
 echo ""
 echo "Press CTRL+C to stop the server"
 echo "================================================================"
@@ -80,5 +83,8 @@ cleanup() {
     exit 0
 }
 
+# Make sure we're in the project directory
+cd /root/Personalized-Email-Marketing
+
 # Run the backend server
-python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+python3 -m uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload --app-dir /root/Personalized-Email-Marketing

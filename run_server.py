@@ -26,16 +26,16 @@ def check_port(port):
 
 def start_backend():
     """Start the FastAPI backend server"""
-    print("Starting FastAPI backend server on port 8000...")
+    print("Starting FastAPI backend server on port 8001...")
     
-    # Check if port 8000 is available
-    if not check_port(8000):
-        print("WARNING: Port 8000 is already in use!")
-        print("   Try: netstat -ano | findstr :8000")
+    # Check if port 8001 is available
+    if not check_port(8001):
+        print("WARNING: Port 8001 is already in use!")
+        print("   Try: netstat -ano | findstr :8001")
         return None
     
     # Start uvicorn in a subprocess
-    cmd = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    cmd = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001", "--reload"]
     process = subprocess.Popen(cmd)
     
     # Wait for server to start
@@ -46,12 +46,12 @@ def start_backend():
 
 def start_frontend():
     """Start a simple HTTP server for the frontend"""
-    print("Starting frontend server on port 3000...")
+    print("Starting frontend server on port 3001...")
     
-    # Check if port 3000 is available
-    if not check_port(3000):
-        print("WARNING: Port 3000 is already in use!")
-        print("   Try: netstat -ano | findstr :3000")
+    # Check if port 3001 is available
+    if not check_port(3001):
+        print("WARNING: Port 3001 is already in use!")
+        print("   Try: netstat -ano | findstr :3001")
         return None
     
     # Change to frontend directory
@@ -61,7 +61,7 @@ def start_frontend():
         return None
     
     # Start Python HTTP server
-    cmd = [sys.executable, "-m", "http.server", "3000", "--directory", "frontend"]
+    cmd = [sys.executable, "-m", "http.server", "3001", "--directory", "frontend"]
     process = subprocess.Popen(cmd)
     
     print("   Frontend server started!")
@@ -98,9 +98,9 @@ def main():
     print("Application Started Successfully!")
     print("=" * 60)
     print("\nAccess Points:")
-    print("   Web Interface:  http://localhost:3000")
-    print("   API Docs:       http://localhost:8000/docs")
-    print("   API Base:       http://localhost:8000/api/v1")
+    print("   Web Interface:  http://localhost:3001")
+    print("   API Docs:       http://localhost:8001/docs")
+    print("   API Base:       http://localhost:8001/api/v1")
     print("\nTips:")
     print("   - Upload a CSV file through the web interface")
     print("   - Check API documentation for endpoints")
@@ -109,7 +109,7 @@ def main():
     # Open browser to the CORRECT interface with field mapping
     print("\nOpening browser to unified interface in 3 seconds...")
     time.sleep(3)
-    webbrowser.open("http://localhost:3000/unified.html")
+    webbrowser.open("http://localhost:3001/unified.html")
     
     try:
         print("\nServers running. Press Ctrl+C to stop...")

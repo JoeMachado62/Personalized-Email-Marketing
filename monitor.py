@@ -95,12 +95,12 @@ def monitor():
             sock.close()
             return result == 0
         
-        backend_status = "RUNNING" if check_port(8000) else "STOPPED"
-        frontend_status = "RUNNING" if check_port(3000) else "STOPPED"
+        backend_status = "RUNNING" if check_port(8001) else "STOPPED"
+        frontend_status = "RUNNING" if check_port(3001) else "STOPPED"
         
         print("SERVER STATUS:")
-        print(f"  Backend (API)     : {backend_status} - http://localhost:8000")
-        print(f"  Frontend (Web)    : {frontend_status} - http://localhost:3000")
+        print(f"  Backend (API)     : {backend_status} - http://localhost:8001")
+        print(f"  Frontend (Web)    : {frontend_status} - http://localhost:3001")
         print()
         
         # Database statistics
@@ -150,8 +150,8 @@ def monitor():
         print()
         print("=" * 60)
         print("URLs:")
-        print("  Web Interface : http://localhost:3000/test.html")
-        print("  API Docs      : http://localhost:8000/docs")
+        print("  Web Interface : http://localhost:3001/test.html")
+        print("  API Docs      : http://localhost:8001/docs")
         print()
         print("Press Ctrl+C to stop monitoring")
         
