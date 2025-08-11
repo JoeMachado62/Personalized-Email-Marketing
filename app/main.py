@@ -11,6 +11,7 @@ import logging
 import sys
 import time
 from pathlib import Path
+import asyncio
 
 from app.db.connection import init_db
 from app.api import jobs, health, column_mapper

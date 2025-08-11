@@ -149,10 +149,14 @@ class MCPClientManager:
             except Exception as e:
                 logger.warning(f"Exa search failed: {e}, using free Google fallback")
         
-        # Fallback to free Google search
-        from .search_with_selenium import search_with_real_chrome
+        # Fallback to free Google search - use Playwright if available
+        try:
+            from .search_with_playwright import search_with_real_chrome
+            logger.info(f"Using free Google search (Playwright) instead: {query}")
+        except ImportError:
+            from .search_with_selenium import search_with_real_chrome
+            logger.warning(f"Using free Google search (Selenium - will open browser windows!): {query}")
         
-        logger.info(f"Using free Google search instead: {query}")
         return search_with_real_chrome(query, headless=True)
     
     async def fetch_in_chunks(self, url: str, chunk_size: int = 5000) -> str:

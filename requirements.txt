@@ -2,7 +2,7 @@
 python-dotenv>=1.0
 httpx>=0.24
 pandas>=2.0
-playwright>=1.39
+playwright>=1.40
 
 # FastAPI and web server dependencies
 fastapi>=0.110.0
@@ -33,5 +33,13 @@ anthropic>=0.3.0  # For Anthropic Claude models (optional)
 
 # The Playwright package requires installing browser binaries after
 # installation. Run `playwright install` once.
+
+# Anti-detection and enhanced scraping libraries (optional but recommended)
+# humanization-playwright>=0.1.0  # For human-like interactions
+# crawlee[playwright]>=0.3.0  # For production-grade scraping
+
+# Note: Selenium dependencies can be removed after successful migration:
+# selenium (to be removed)
+# webdriver-manager (to be removed)
 
 # For asynchronous task scheduling (optional, used implicitly via asyncio)

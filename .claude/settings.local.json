@@ -14,7 +14,11 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:www.zenrows.com)",
       "WebFetch(domain:dev.to)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(dir test_screenshot.png)",
+      "Bash(dir:*)",
+      "WebFetch(domain:docs.seraphnet.ai)"
     ],
     "deny": []
   }

@@ -163,10 +163,12 @@ async def _enrich_record(record: DealerRecord, concurrency_semaphore: asyncio.Se
                 contact_info = scraped_data.get('website_data', {}).get('contact_info', {})
                 if contact_info.get('emails'):
                     # Try to identify owner email
-                    for email in contact_info['emails']:
-                        if owner_info.get('first_name', '').lower() in email.lower():
-                            record.owner_email = email
-                            break
+                    owner_first = owner_info.get('first_name')
+                    if owner_first:
+                        for email in contact_info['emails']:
+                            if owner_first.lower() in email.lower():
+                                record.owner_email = email
+                                break
                     if not record.owner_email:
                         record.owner_email = contact_info['emails'][0]  # Use first found
                 if contact_info.get('phones') and not record.owner_phone:

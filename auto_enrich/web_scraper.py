@@ -1,20 +1,61 @@
 """
-Enhanced web scraper using Selenium and MCP Fetch.
+Enhanced web scraper that automatically uses Playwright if available, falls back to Selenium.
 This follows the architectural design: Search -> Scrape -> AI Interpret -> Store
-NO PLAYWRIGHT - uses Selenium for search and MCP Fetch for content extraction.
+Uses migration adapter to seamlessly switch between implementations.
 """
 
 import asyncio
 import logging
+import os
+import sys
 from typing import Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
-# Import the Selenium-only implementation
-from .web_scraper_selenium import SeleniumWebGatherer, search_web
+# Check for Serper API first (most reliable)
+USE_SERPER = os.environ.get('SERPER_API_KEY') is not None
+USE_PLAYWRIGHT = os.environ.get('USE_PLAYWRIGHT', 'true').lower() == 'true' if not USE_SERPER else False
 
-# Use the Selenium implementation
-WebDataGatherer = SeleniumWebGatherer
+# Use Serper API if available (fastest and most reliable)
+if USE_SERPER:
+    logger.info("Using Serper API for search (fast, reliable, no browser windows!)")
+    from .web_scraper_serper import SerperWebGatherer as WebDataGatherer, search_web
+    
+# Windows-specific handling for Playwright
+elif USE_PLAYWRIGHT and sys.platform == 'win32':
+    try:
+        # Check if we're in a running event loop (FastAPI/uvicorn)
+        asyncio.get_running_loop()
+        # We're in an existing loop - use enhanced subprocess wrapper for Windows
+        logger.info("Windows detected with existing event loop - using enhanced Playwright subprocess wrapper")
+        from .playwright_subprocess_wrapper_v2 import WindowsPlaywrightGatherer as WebDataGatherer
+        from .playwright_subprocess_wrapper_v2 import PlaywrightSubprocessWrapperV2
+        
+        async def search_web(query, **kwargs):
+            wrapper = PlaywrightSubprocessWrapperV2()
+            return await wrapper.search_web(query, kwargs.get('max_results', 10))
+            
+    except RuntimeError:
+        # No event loop - safe to use Playwright directly
+        try:
+            from .web_scraper_playwright import PlaywrightWebGatherer as WebDataGatherer, search_web
+            logger.info("Using Playwright implementation (direct mode)")
+        except (ImportError, Exception) as e:
+            logger.warning(f"Playwright error ({e}), falling back to Selenium")
+            from .web_scraper_selenium import SeleniumWebGatherer as WebDataGatherer, search_web
+            
+elif USE_PLAYWRIGHT:
+    # Non-Windows systems can use Playwright directly
+    try:
+        from .web_scraper_playwright import PlaywrightWebGatherer as WebDataGatherer, search_web
+        logger.info("Using Playwright implementation (anti-detection enabled)")
+    except (ImportError, Exception) as e:
+        logger.warning(f"Playwright error ({e}), falling back to Selenium (browser windows will open!)")
+        from .web_scraper_selenium import SeleniumWebGatherer as WebDataGatherer, search_web
+else:
+    # Explicitly use Selenium if requested
+    from .web_scraper_selenium import SeleniumWebGatherer as WebDataGatherer, search_web
+    logger.info("Using Selenium implementation (USE_PLAYWRIGHT=false)")
 
 # Don't log at import time - can cause issues
 # logger.info("Using Selenium + MCP Fetch implementation")
@@ -30,7 +71,7 @@ async def gather_web_data(
     use_mcp_fetch: bool = True
 ) -> Dict[str, Any]:
     """
-    Backward compatibility wrapper for the new SeleniumWebGatherer.
+    Backward compatibility wrapper for web data gathering.
     
     Args:
         company_name: Company name to search
@@ -38,14 +79,14 @@ async def gather_web_data(
         additional_data: Additional data dictionary (phone, email, etc.)
         phone: Phone number (optional, legacy parameter)
         campaign_context: Campaign context for targeted searches
-        search_provider: Search provider (always selenium now)
+        search_provider: Search provider (uses configured implementation)
         use_mcp_fetch: Whether to use MCP Fetch for content extraction
         
     Returns:
         Dictionary with gathered web data
     """
-    # SeleniumWebGatherer doesn't take init parameters
-    async with SeleniumWebGatherer() as gatherer:
+    # Use the configured WebDataGatherer (Playwright or Selenium)
+    async with WebDataGatherer() as gatherer:
         # Handle both new additional_data dict and legacy phone parameter
         if not additional_data:
             additional_data = {}

@@ -4,17 +4,53 @@ nul
 # Ignore environment and secrets
 .env
 .env.*
+*.env
 
 # Ignore log files
 *.log
+logs/
 
 # Ignore Python cache
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
 
 # Ignore uploads and local data
 uploads/
 data/
+outputs/
 
-# Ignore VS Code workspace settings
+# Ignore IDE settings
 .vscode/
+.idea/
+*.swp
+*.swo
+
+# Windows specific files (exclude from Linux)
+*.bat
+WINDOWS_*.md
+*_windows_*.py
+
+# Test files
+test_*.py
+test_*.json
+*.png
+*.jpg
+debug_*.py
+fix_*.py
+
+# Temporary files
+_*.py
+tmp/
+temp/
+
+# Claude
+.claude/
+
+# Node
+node_modules/
+package-lock.json

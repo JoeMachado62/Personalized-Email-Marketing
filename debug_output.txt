@@ -1,0 +1,9 @@
+DEBUG:asyncio:Using proactor: IocpProactor
+INFO:auto_enrich.playwright_browser_manager:Launching browser (headless=True)
+INFO:auto_enrich.playwright_browser_manager:Browser initialized successfully with anti-detection measures
+DEBUG:auto_enrich.playwright_browser_manager:Stealth scripts injected into context
+INFO:auto_enrich.playwright_browser_manager:Created stealth context: default
+DEBUG:auto_enrich.playwright_browser_manager:Created new page in context: default
+INFO:auto_enrich.playwright_browser_manager:Closed context: default
+INFO:auto_enrich.playwright_browser_manager:Browser manager cleaned up successfully
+INFO:auto_enrich.playwright_browser_manager:Browser manager cleaned up successfully

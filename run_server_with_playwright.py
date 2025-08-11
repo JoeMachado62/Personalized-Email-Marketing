@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Simple startup script for the AI Sales Agent MVP.
-Starts both the backend API and serves the frontend.
+Windows-compatible server startup script with Playwright support.
+Sets the ProactorEventLoop BEFORE uvicorn starts to ensure compatibility.
 """
 
 import os
@@ -12,9 +12,11 @@ import webbrowser
 from pathlib import Path
 import asyncio
 
-# Fix Windows event loop for Playwright compatibility
+# CRITICAL: Set Windows event loop policy BEFORE ANY imports that might create loops
 if sys.platform == 'win32':
+    # Force ProactorEventLoop for Windows subprocess support (required by Playwright)
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    print("✓ Windows ProactorEventLoop policy set for Playwright compatibility")
 
 def check_port(port):
     """Check if a port is available"""
@@ -25,7 +27,7 @@ def check_port(port):
     return result != 0  # True if port is available
 
 def start_backend():
-    """Start the FastAPI backend server"""
+    """Start the FastAPI backend server with proper Windows event loop"""
     print("Starting FastAPI backend server on port 8000...")
     
     # Check if port 8000 is available
@@ -34,9 +36,37 @@ def start_backend():
         print("   Try: netstat -ano | findstr :8000")
         return None
     
-    # Start uvicorn in a subprocess
-    cmd = [sys.executable, "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
-    process = subprocess.Popen(cmd)
+    # Set environment variable to ensure Playwright is used
+    env = os.environ.copy()
+    env['USE_PLAYWRIGHT'] = 'true'
+    
+    # Create a Python script that sets event loop policy before importing uvicorn
+    launcher_script = """
+import sys
+import asyncio
+from multiprocessing import freeze_support
+
+if __name__ == '__main__':
+    # Required for Windows multiprocessing
+    freeze_support()
+    
+    # Set Windows event loop policy FIRST
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    
+    # Now import and run uvicorn
+    import uvicorn
+    # NOTE: reload=False to avoid multiprocessing issues on Windows with ProactorEventLoop
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)
+"""
+    
+    # Write the launcher script
+    launcher_path = Path("_uvicorn_launcher.py")
+    launcher_path.write_text(launcher_script)
+    
+    # Start uvicorn using the launcher script
+    cmd = [sys.executable, str(launcher_path)]
+    process = subprocess.Popen(cmd, env=env)
     
     # Wait for server to start
     print("   Waiting for server to start...")
@@ -69,19 +99,24 @@ def start_frontend():
 
 def main():
     print("=" * 60)
-    print("AI Sales Agent MVP - Starting Application")
+    print("AI Sales Agent MVP - Starting Application (Playwright Mode)")
     print("=" * 60)
+    
+    # Set environment to use Playwright
+    os.environ['USE_PLAYWRIGHT'] = 'true'
+    print("\n✓ Playwright mode enabled (no browser windows will open)")
     
     # Initialize database
     print("\nInitializing database...")
     try:
+        # Import AFTER setting event loop policy
         from app.db.connection import init_db
         init_db()
         print("   Database initialized successfully!")
     except Exception as e:
         print(f"   Warning: Database initialization issue: {e}")
     
-    # Start backend
+    # Start backend with proper event loop
     backend_process = start_backend()
     if not backend_process:
         print("ERROR: Failed to start backend server")
@@ -98,9 +133,13 @@ def main():
     print("Application Started Successfully!")
     print("=" * 60)
     print("\nAccess Points:")
-    print("   Web Interface:  http://localhost:3000")
+    print("   Web Interface:  http://localhost:3000/unified.html")
     print("   API Docs:       http://localhost:8000/docs")
     print("   API Base:       http://localhost:8000/api/v1")
+    print("\nFeatures:")
+    print("   ✓ Playwright anti-detection enabled")
+    print("   ✓ No browser windows will open")
+    print("   ✓ Windows compatibility mode active")
     print("\nTips:")
     print("   - Upload a CSV file through the web interface")
     print("   - Check API documentation for endpoints")
@@ -120,6 +159,12 @@ def main():
         print("\n\nShutting down servers...")
         backend_process.terminate()
         frontend_process.terminate()
+        
+        # Clean up launcher script
+        launcher_path = Path("_uvicorn_launcher.py")
+        if launcher_path.exists():
+            launcher_path.unlink()
+        
         print("Servers stopped successfully!")
         return 0
 
