@@ -303,9 +303,18 @@ async def download_results(
             raise HTTPException(404, "No enriched records found")
         
         if format == "csv":
-            # Generate CSV
+            # Check if enriched CSV already exists
             output_path = settings.OUTPUT_DIR / f"{job_id}_enriched.csv"
             
+            # If file exists, serve it directly
+            if output_path.exists():
+                return FileResponse(
+                    output_path,
+                    media_type="text/csv",
+                    filename=f"enriched_{job_id}.csv"
+                )
+            
+            # Otherwise, generate CSV from database records
             # Flatten records for CSV format
             flattened_records = []
             for record in records:

@@ -43,7 +43,7 @@ class SerperClient:
         }
     
     async def search(self, query: str, location: Optional[str] = None, 
-                    num_results: int = 10, search_type: str = "search") -> Dict[str, Any]:
+                    num_results: int = 20, search_type: str = "search") -> Dict[str, Any]:
         """
         Perform a search using Serper API.
         
@@ -107,8 +107,8 @@ class SerperClient:
         else:
             query = company_name
         
-        # Perform search
-        results = await self.search(query, location=location, num_results=10)
+        # Perform search - request more results for better coverage
+        results = await self.search(query, location=location, num_results=25)
         
         # Format results for our system
         formatted_results = []
@@ -223,7 +223,7 @@ class SerperSearchProvider:
 
 # Compatibility function for existing code
 async def search_with_serper(query: str, location: Optional[str] = None, 
-                            max_results: int = 10) -> List[Dict[str, Any]]:
+                            max_results: int = 20) -> List[Dict[str, Any]]:
     """
     Search using Serper API - drop-in replacement for search_with_selenium.
     

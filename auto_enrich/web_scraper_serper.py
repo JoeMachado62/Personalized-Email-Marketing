@@ -1,6 +1,6 @@
 """
-Web scraper using Serper API for search and MCP for content extraction.
-Fast, reliable, no browser windows, no detection issues.
+Web scraper using Serper API for search with ENHANCED multi-URL scraping.
+Now scrapes 10-15 URLs per company for comprehensive data gathering.
 """
 
 import asyncio
@@ -8,19 +8,26 @@ import logging
 from typing import Dict, Any, Optional, List
 from urllib.parse import urlparse
 
-from .serper_client import SerperClient, search_with_serper
+# Try to use the enhanced version first
 try:
-    from .enhanced_content_extractor import EnhancedContentExtractor as MCPContentExtractor
+    from .web_scraper_enhanced import SerperWebGatherer as EnhancedSerperWebGatherer
+    logger = logging.getLogger(__name__)
+    logger.info("Using ENHANCED multi-URL web scraper")
+    SerperWebGatherer = EnhancedSerperWebGatherer
 except ImportError:
+    logger = logging.getLogger(__name__)
+    logger.info("Enhanced scraper not available, using original")
+    
+    from .serper_client import SerperClient, search_with_serper
     try:
-        from .mcp_fetch_client import SimpleMCPExtractor as MCPContentExtractor
+        from .enhanced_content_extractor import EnhancedContentExtractor as MCPContentExtractor
     except ImportError:
-        from .mcp_client import MCPContentExtractor
-
-logger = logging.getLogger(__name__)
-
-
-class SerperWebGatherer:
+        try:
+            from .mcp_fetch_client import SimpleMCPExtractor as MCPContentExtractor
+        except ImportError:
+            from .mcp_client import MCPContentExtractor
+    
+    class SerperWebGatherer:
     """
     Web data gatherer using Serper API for search and MCP for content.
     The most reliable and scalable solution.

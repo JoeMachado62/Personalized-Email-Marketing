@@ -217,19 +217,27 @@ class DataInterpreter:
             'website': data.get('website_url')
         }
         
-        # Add multi-source profile if available (NEW)
+        # Add multi-source profile if available (ENHANCED)
         if data.get('multi_source_profile'):
             profile = data['multi_source_profile']
             summary['multi_source_profile'] = {
                 'sources_used': profile.get('sources_used', []),
+                'urls_scraped': profile.get('urls_scraped', 0),
+                'total_content_chars': profile.get('total_content_chars', 0),
                 'owner_info': profile.get('owner_info', {}),
-                'recent_activity': profile.get('recent_activity', [])[:3],
-                'pain_points': list(set(profile.get('pain_points', [])))[:5],
-                'achievements': profile.get('achievements', [])[:3],
-                'social_presence': profile.get('social_presence', {}),
-                'reputation': profile.get('reputation', {}),
-                'personalization_hooks': profile.get('personalization_hooks', [])[:5]
+                'business_details': profile.get('business_details', {}),
+                'contact_info': profile.get('contact_info', {}),
+                'social_media': profile.get('social_media', {}),
+                'recent_activity': profile.get('recent_activity', [])[:5],
+                'pain_points': list(set(profile.get('pain_points', [])))[:7],
+                'achievements': profile.get('achievements', [])[:5],
+                'reviews': profile.get('reviews', [])[:3],
+                'registry_data': profile.get('registry_data', {})
             }
+            
+            # Add combined content for AI processing (truncated)
+            if profile.get('combined_content'):
+                summary['rich_content'] = profile['combined_content'][:5000]
             
             # If we have personalization hooks, add them prominently
             if profile.get('personalization_hooks'):
@@ -285,12 +293,12 @@ class DataInterpreter:
         # Prepare concise data summary
         data_summary = self._prepare_data_summary(scraped_data)
         
-        # Single comprehensive prompt for all extractions
+        # Enhanced prompt for multi-source data
         batch_prompt = f"""
-        Analyze the following scraped data and extract ALL requested information in a single response.
+        Analyze the following comprehensive business data gathered from multiple sources and extract ALL requested information in a single response.
         
         DATA TO ANALYZE:
-        {json.dumps(data_summary, indent=2)[:4000]}  # Increased limit for batch processing
+        {json.dumps(data_summary, indent=2)[:8000]}  # Increased for multi-source data
         
         EXTRACT THE FOLLOWING (JSON format required):
         {{
@@ -350,8 +358,8 @@ class DataInterpreter:
                     {"role": "system", "content": "You are a data extraction specialist. Extract only factual information present in the provided data. Return valid JSON."},
                     {"role": "user", "content": batch_prompt}
                 ],
-                "max_tokens": 500,  # Increased for batch response
-                "temperature": 0.3,  # Low temperature for factual extraction
+                "max_tokens": 800,  # Increased for richer content generation
+                "temperature": 0.4,  # Slightly higher for better personalization
                 "response_format": {"type": "json_object"}  # Ensure JSON response
             }
             
