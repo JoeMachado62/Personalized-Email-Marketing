@@ -296,12 +296,6 @@ async def download_results(
         if job['status'] != "completed":
             raise HTTPException(400, f"Job is {job['status']}, not completed")
         
-        # Get enriched records
-        records = JobService.get_enriched_records(job_id, include_failed)
-        
-        if not records:
-            raise HTTPException(404, "No enriched records found")
-        
         if format == "csv":
             # Check if enriched CSV already exists
             output_path = settings.OUTPUT_DIR / f"{job_id}_enriched.csv"
@@ -313,6 +307,13 @@ async def download_results(
                     media_type="text/csv",
                     filename=f"enriched_{job_id}.csv"
                 )
+            
+            # Try to get records from database if file doesn't exist
+            records = JobService.get_enriched_records(job_id, include_failed)
+            
+            if not records:
+                # No file and no records - enrichment may have saved directly to CSV
+                raise HTTPException(404, "Enriched file not found. The enrichment may have failed.")
             
             # Otherwise, generate CSV from database records
             # Flatten records for CSV format
@@ -353,7 +354,19 @@ async def download_results(
                 filename=f"enriched_{job_id}.csv"
             )
         else:
-            # Return JSON
+            # Return JSON - try to read from CSV if records not in DB
+            records = JobService.get_enriched_records(job_id, include_failed)
+            
+            if not records:
+                # Try to read from CSV file
+                output_path = settings.OUTPUT_DIR / f"{job_id}_enriched.csv"
+                if output_path.exists():
+                    import pandas as pd
+                    df = pd.read_csv(output_path)
+                    records = df.to_dict('records')
+                else:
+                    raise HTTPException(404, "No enriched data found")
+            
             return {
                 "job_id": job_id,
                 "job_status": job['status'],

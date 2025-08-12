@@ -10,6 +10,9 @@ import os
 import sys
 from typing import Dict, Any, Optional
 
+# Import config to load environment variables from .env file
+from . import config
+
 logger = logging.getLogger(__name__)
 
 # Check for Serper API first (most reliable)
@@ -18,8 +21,9 @@ USE_PLAYWRIGHT = os.environ.get('USE_PLAYWRIGHT', 'true').lower() == 'true' if n
 
 # Use Serper API if available (fastest and most reliable)
 if USE_SERPER:
-    logger.info("Using Serper API for search (fast, reliable, no browser windows!)")
-    from .web_scraper_serper import SerperWebGatherer as WebDataGatherer, search_web
+    logger.info("Using FOCUSED Serper Maps + Sunbiz approach for high-quality data!")
+    from .focused_web_scraper import FocusedWebGatherer as WebDataGatherer
+    from .serper_client import search_with_serper as search_web
     
 # Windows-specific handling for Playwright
 elif USE_PLAYWRIGHT and sys.platform == 'win32':
@@ -58,7 +62,7 @@ else:
     logger.info("Using Selenium implementation (USE_PLAYWRIGHT=false)")
 
 # Don't log at import time - can cause issues
-# logger.info("Using Selenium + MCP Fetch implementation")
+# logger.info("Using Selenium + Markdownify implementation")
 
 # Backward compatibility wrapper function
 async def gather_web_data(
@@ -67,8 +71,7 @@ async def gather_web_data(
     additional_data: Optional[Dict] = None,
     phone: str = "",
     campaign_context: Optional[Dict] = None,
-    search_provider: str = "selenium",
-    use_mcp_fetch: bool = True
+    search_provider: str = "selenium"
 ) -> Dict[str, Any]:
     """
     Backward compatibility wrapper for web data gathering.
@@ -80,7 +83,6 @@ async def gather_web_data(
         phone: Phone number (optional, legacy parameter)
         campaign_context: Campaign context for targeted searches
         search_provider: Search provider (uses configured implementation)
-        use_mcp_fetch: Whether to use MCP Fetch for content extraction
         
     Returns:
         Dictionary with gathered web data

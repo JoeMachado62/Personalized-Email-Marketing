@@ -343,10 +343,15 @@ class MultiURLScraper:
                 # Special handling for business registries
                 if any(reg in url.lower() for reg in ['sunbiz', 'sos.state', 'corporations']):
                     result['is_business_registry'] = True
-                    # Parse with specialized parser
-                    parsed = self.registry_parser.parse(url, result['content'])
-                    result['parsed_data'] = parsed
-                    logger.info(f"Parsed business registry: {bool(parsed.get('owner_info'))}")
+                    # Use raw HTML if available, otherwise use the text content
+                    html_to_parse = content.get('raw_html', '') if isinstance(content, dict) else result['content']
+                    if html_to_parse:
+                        # Parse with specialized parser using raw HTML
+                        parsed = self.registry_parser.parse(url, html_to_parse)
+                        result['parsed_data'] = parsed
+                        logger.info(f"Parsed business registry: {bool(parsed.get('owner_info'))}")
+                    else:
+                        logger.warning(f"No raw HTML available for registry parsing: {url}")
                 
                 logger.info(f"Scraped {result['content_length']} chars from {result['domain']}")
             else:

@@ -209,6 +209,109 @@ class DataInterpreter:
             logger.error(f"AI extraction error for {task_name}: {str(e)}")
             return {'error': str(e)}
     
+    def _prepare_enhanced_data_summary(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Prepare an enhanced, well-structured summary of all collected data"""
+        summary = {
+            'company_name': data.get('company_name'),
+            'location': data.get('location'),
+            'website_url': data.get('website_url'),
+        }
+        
+        # PRIORITIZED: Owner and personnel information
+        personnel_info = {'owners': [], 'team_members': []}
+        
+        # Extract from multi-source profile
+        if data.get('multi_source_profile'):
+            profile = data['multi_source_profile']
+            
+            # Owner information with high priority
+            if profile.get('owner_info'):
+                owner = profile['owner_info']
+                personnel_info['owners'].append({
+                    'name': f"{owner.get('first_name', '')} {owner.get('last_name', '')}".strip() or owner.get('full_name'),
+                    'title': owner.get('title'),
+                    'source': owner.get('source', 'web')
+                })
+            
+            # All personnel for context (from Sunbiz or website)
+            if profile.get('all_personnel'):
+                personnel_info['team_members'] = profile['all_personnel']
+            
+            # Business details from Maps and website
+            summary['business_details'] = {
+                'type': profile.get('business_details', {}).get('type'),
+                'rating': profile.get('business_details', {}).get('rating'),
+                'hours': profile.get('business_details', {}).get('hours'),
+                'phone_numbers': profile.get('contact_info', {}).get('phones', []),
+                'emails': profile.get('contact_info', {}).get('emails', []),
+                'websites': profile.get('contact_info', {}).get('websites', [])
+            }
+            
+            # Corporate information from Sunbiz
+            if profile.get('registry_data'):
+                registry = profile['registry_data']
+                summary['corporate_info'] = {
+                    'entity_type': registry.get('entity_type'),
+                    'fein': registry.get('filing_info', {}).get('fein'),
+                    'date_filed': registry.get('filing_info', {}).get('date_filed'),
+                    'status': registry.get('filing_info', {}).get('status'),
+                    'registered_agent': registry.get('registered_agent', {}).get('name')
+                }
+                
+                # Add authorized persons
+                for person in registry.get('authorized_persons', []):
+                    personnel_info['owners'].append({
+                        'name': person.get('full_name'),
+                        'title': person.get('title'),
+                        'source': 'sunbiz'
+                    })
+                
+                # Add officers as team members
+                for officer in registry.get('officers', []):
+                    personnel_info['team_members'].append(
+                        f"{officer.get('full_name')} ({officer.get('title')})"
+                    )
+            
+            # Website content summary
+            if profile.get('combined_content'):
+                summary['website_content'] = {
+                    'sample': profile['combined_content'][:3000],  # First 3000 chars
+                    'total_chars': profile.get('total_content_chars', 0),
+                    'pages_scraped': profile.get('urls_scraped', 0)
+                }
+            
+            # Include all the existing profile data
+            summary['multi_source_profile'] = profile
+        
+        # Add the personnel info to summary
+        summary['personnel'] = personnel_info
+        
+        # Add Maps data if available (hours, rating, etc.)
+        if data.get('maps_data'):
+            maps = data['maps_data']
+            summary['google_maps_info'] = {
+                'business_name': maps.get('title'),
+                'address': maps.get('address'),
+                'phone': maps.get('phone'),
+                'website': maps.get('website'),
+                'rating': maps.get('rating'),
+                'rating_count': maps.get('rating_count'),
+                'business_type': maps.get('type'),
+                'hours': maps.get('hours')
+            }
+        
+        # Keep existing data as well
+        if data.get('website_data'):
+            summary['website_data'] = data['website_data']
+        
+        if data.get('search_results'):
+            summary['search_results'] = data['search_results'][:5]
+        
+        if data.get('campaign_context'):
+            summary['campaign_context'] = data['campaign_context']
+            
+        return summary
+    
     def _prepare_data_summary(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare a concise summary of scraped data for AI processing"""
         summary = {
@@ -290,15 +393,13 @@ class DataInterpreter:
             logger.error("No LLM API key configured")
             return {}
         
-        # Prepare concise data summary
-        data_summary = self._prepare_data_summary(scraped_data)
+        # Prepare enhanced data summary with better structure
+        data_summary = self._prepare_enhanced_data_summary(scraped_data)
         
         # Enhanced prompt for multi-source data
         batch_prompt = f"""
-        Analyze the following comprehensive business data gathered from multiple sources and extract ALL requested information in a single response.
-        
-        DATA TO ANALYZE:
-        {json.dumps(data_summary, indent=2)[:8000]}  # Increased for multi-source data
+        BUSINESS DATA ANALYSIS:
+        {json.dumps(data_summary, indent=2)[:10000]}  # Increased for richer context
         
         EXTRACT THE FOLLOWING (JSON format required):
         {{
@@ -355,11 +456,36 @@ class DataInterpreter:
             payload = {
                 "model": LLM_MODEL_NAME,
                 "messages": [
-                    {"role": "system", "content": "You are a data extraction specialist. Extract only factual information present in the provided data. Return valid JSON."},
+                    {"role": "system", "content": """You are a two-in-one expert:
+
+First, act as a Data Analyst specializing in marketing personalization. Review the data dump which includes business information, corporate ownership details, and website content. Identify unique selling points, pain points, notable achievements, industry context, and anything that would allow for a highly personalized outreach message.
+
+Second, switch roles to a Marketing Copywriter and transform these insights into engaging marketing material.
+
+Your job is to produce:
+
+Subject Line → A concise, high-impact subject line that feels personal, relevant, and likely to boost open rates.
+
+Icebreaker Intro Paragraph → A warm, multi-line opening paragraph that references the specific business context and feels custom-written for this company. It should build rapport without being "salesy" and lead naturally into a segue line provided later in the campaign.
+
+Guidelines:
+- DO NOT repeat generic phrases like "I came across your website…" unless backed by specific context.
+- Keep the subject line under 9 words.
+- Make the icebreaker 3–4 short sentences max, each sentence naturally leading to the next.
+- The tone should be friendly, credible, and human — avoid sounding like AI.
+- Use details from the provided data wherever possible.
+- If owner/manager names are provided, use them appropriately.
+- Reference specific business details like years in business, location specifics, team members, or recent achievements.
+
+Output Format:
+SUBJECT_LINE: {short, punchy subject line here}
+ICEBREAKER: {multi-line personalized intro paragraph here}
+
+Return all requested data in valid JSON format."""},
                     {"role": "user", "content": batch_prompt}
                 ],
-                "max_tokens": 800,  # Increased for richer content generation
-                "temperature": 0.4,  # Slightly higher for better personalization
+                "max_tokens": 1000,  # Increased for richer content generation
+                "temperature": 0.5,  # Balanced for creativity and accuracy
                 "response_format": {"type": "json_object"}  # Ensure JSON response
             }
             

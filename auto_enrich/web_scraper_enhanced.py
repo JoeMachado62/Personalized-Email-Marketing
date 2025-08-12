@@ -90,15 +90,20 @@ class EnhancedWebGatherer:
             'company_name': multi_scraper_result.get('company_name'),
             'location': multi_scraper_result.get('location'),
             
-            # Search results info
-            'search_results': [],  # We'll populate this below
+            # Search results info (populate with actual results)
+            'search_results': multi_scraper_result.get('search_results', []),
             'search_results_count': multi_scraper_result.get('search_results_count', 0),
             'search_engine': 'serper_enhanced',
             
-            # Website info
+            # Website info (populate with aggregated content)
             'website_found': bool(website_url),
             'website_url': website_url,
-            'website_data': {},
+            'website_data': {
+                'content': aggregated.get('combined_text', ''),
+                'title': extracted_data.get('business_details', {}).get('name', ''),
+                'description': aggregated.get('company_website', {}).get('content', '')[:500],
+                'sources': multi_scraper_result.get('urls_scraped', 0)
+            },
             
             # Multi-source profile (NEW - this is where the magic happens!)
             'multi_source_profile': {

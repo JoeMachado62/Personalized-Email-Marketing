@@ -28,14 +28,8 @@ from .playwright_browser_manager import (
 )
 from .search_with_playwright import PlaywrightSearch
 
-# Import MCP client for content fetching
-try:
-    from .mcp_client import create_mcp_manager, MCPRouter
-    MCP_AVAILABLE = True
-except ImportError:
-    MCP_AVAILABLE = False
-    logger = logging.getLogger(__name__)
-    logger.warning("MCP client not available, using Playwright-only mode")
+# MCP has been removed - using Playwright-only mode
+MCP_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -54,8 +48,6 @@ class PlaywrightWebGatherer:
             headless: MUST be True in production to prevent window spam
         """
         self.headless = headless
-        self.mcp_manager = None
-        self.mcp_router = None
         self.searcher = PlaywrightSearch(headless=headless)
         self.simulator = HumanBehaviorSimulator()
     
@@ -64,31 +56,16 @@ class PlaywrightWebGatherer:
         # Initialize browser manager
         await browser_manager.initialize(headless=self.headless)
         
-        # Initialize MCP if available
-        if MCP_AVAILABLE:
-            try:
-                self.mcp_manager = await create_mcp_manager()
-                if self.mcp_manager and self.mcp_manager.initialized:
-                    self.mcp_router = MCPRouter(self.mcp_manager)
-                    logger.info("MCP Fetch initialized for content extraction")
-                else:
-                    logger.info("MCP not available - using Playwright for all operations")
-            except Exception as e:
-                logger.warning(f"MCP initialization failed: {e} - using Playwright only")
+        # Using Playwright for all operations
+        logger.info("Using Playwright for all web operations")
         
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit - cleanup resources."""
-        # Cleanup MCP
-        if self.mcp_manager:
-            try:
-                await self.mcp_manager.close()
-            except:
-                pass
-        
         # Note: Don't cleanup browser_manager here as it's a singleton
         # It should be cleaned up at application shutdown
+        pass
     
     async def search_and_gather(self, company_name: str, location: str,
                                additional_data: Dict[str, str] = None,

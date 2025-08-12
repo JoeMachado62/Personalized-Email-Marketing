@@ -25,7 +25,14 @@
       "Bash(grep:*)",
       "Bash(kill:*)",
       "Bash(chmod:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(node:*)",
+      "Bash(npx:*)",
+      "Bash(playwright install:*)",
+      "Bash(for file in test*.py)",
+      "Bash(do mv \"$file\" test_scripts/)",
+      "Bash(done)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }

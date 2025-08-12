@@ -180,6 +180,66 @@ class SerperClient:
             }
         
         return None
+    
+    async def search_maps(self, company_name: str, address: str) -> Optional[Dict[str, Any]]:
+        """
+        Search Google Maps for business information.
+        
+        Args:
+            company_name: Business name
+            address: Full address of the business
+            
+        Returns:
+            Business information from Google Maps including website, phone, hours
+        """
+        # Combine name and address for best results
+        query = f"{company_name} {address}"
+        
+        # Use 'maps' endpoint for Google Maps data
+        endpoint = f"{self.base_url}/maps"
+        
+        payload = {
+            'q': query,
+            'num': 10  # Get top 10 results to find best match
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(endpoint, json=payload, headers=self.headers) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        if data.get('places'):
+                            # Return the first (best) match
+                            place = data['places'][0]
+                            logger.info(f"Serper Maps found: {place.get('title')} - {place.get('website')}")
+                            
+                            return {
+                                'title': place.get('title'),
+                                'address': place.get('address'),
+                                'website': place.get('website'),
+                                'phone': place.get('phoneNumber'),
+                                'rating': place.get('rating'),
+                                'rating_count': place.get('ratingCount'),
+                                'type': place.get('type'),
+                                'types': place.get('types', []),
+                                'hours': place.get('openingHours', {}),
+                                'latitude': place.get('latitude'),
+                                'longitude': place.get('longitude'),
+                                'place_id': place.get('placeId'),
+                                'cid': place.get('cid')
+                            }
+                        else:
+                            logger.warning(f"No Maps results for: {query}")
+                            return None
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"Serper Maps API error {response.status}: {error_text}")
+                        return None
+                        
+        except Exception as e:
+            logger.error(f"Serper Maps request failed: {e}")
+            return None
 
 
 class SerperSearchProvider:

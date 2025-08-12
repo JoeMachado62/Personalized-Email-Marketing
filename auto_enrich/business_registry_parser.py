@@ -95,7 +95,8 @@ class BusinessRegistryParser:
                     # Find the primary owner (President, CEO, Managing Member, etc.)
                     for officer in officers:
                         title = officer.get('title', '').upper()
-                        if any(term in title for term in ['PRESIDENT', 'CEO', 'OWNER', 'MANAGING MEMBER', 'MANAGER']):
+                        # PT = President, P = President, PRES = President
+                        if any(term in title for term in ['PRESIDENT', 'PRES', 'PT', 'P', 'CEO', 'OWNER', 'MANAGING MEMBER', 'MANAGER', 'MGR']):
                             result['owner_info'] = {
                                 'full_name': officer.get('name', ''),
                                 'first_name': self._extract_first_name(officer.get('name', '')),
@@ -159,52 +160,70 @@ class BusinessRegistryParser:
         officers = []
         
         try:
-            # Look for spans with specific labels
+            # Get the full HTML content of the section
+            section_html = str(section)
+            
+            # Method 1: Look for Title followed by name text
+            # Pattern: <span>Title PT</span> followed by text node with name
+            import re
+            
+            # Get all text content from section
+            section_text = section.get_text()
+            
+            # Pattern to find Title followed by name
+            # Example: "Title PT\n\nMITCHELL, ROBERT A"
+            title_name_pattern = r'Title\s+([A-Z, ]+)\s+([A-Z][A-Z\s,.-]+?)\s*(?:Title|$|\d)'
+            matches = re.findall(title_name_pattern, section_text, re.MULTILINE)
+            
+            for match in matches:
+                title = match[0].strip()
+                name = match[1].strip()
+                if name and title:
+                    officers.append({
+                        'title': title,
+                        'name': name
+                    })
+            
+            # Method 2: Parse the actual HTML structure we saw
+            # Looking for pattern: <span>Title PT</span><br><br>NAME
             spans = section.find_all('span')
-            current_officer = {}
             
             for i, span in enumerate(spans):
                 text = span.get_text(strip=True)
                 
-                if text == 'Title':
-                    # Next span should have the title value
-                    if i + 1 < len(spans):
-                        current_officer['title'] = spans[i + 1].get_text(strip=True)
-                
-                elif text == 'Name':
-                    # Next span should have the name value
-                    if i + 1 < len(spans):
-                        current_officer['name'] = spans[i + 1].get_text(strip=True)
-                
-                elif text == 'Address':
-                    # Collect address lines
-                    if i + 1 < len(spans):
-                        address_parts = []
-                        j = i + 1
-                        while j < len(spans) and spans[j].get_text(strip=True) not in ['Title', 'Name', 'Address']:
-                            addr_text = spans[j].get_text(strip=True)
-                            if addr_text:
-                                address_parts.append(addr_text)
-                            j += 1
-                        current_officer['address'] = ' '.join(address_parts)
-                
-                # When we have a complete officer record
-                if 'name' in current_officer and 'title' in current_officer:
-                    officers.append(current_officer.copy())
-                    current_officer = {}
+                # Check if this span starts with "Title"
+                if text.startswith('Title'):
+                    # Extract title (e.g., "PT" from "Title PT")
+                    title = text.replace('Title', '').strip()
+                    
+                    # The name often comes as text after this span
+                    # Get the next text node after this span
+                    next_node = span.next_sibling
+                    while next_node:
+                        if next_node.string and next_node.string.strip():
+                            # Check if this looks like a name (has letters and possibly commas)
+                            potential_name = next_node.string.strip()
+                            if re.match(r'^[A-Z][A-Z\s,.-]+$', potential_name):
+                                officers.append({
+                                    'title': title,
+                                    'name': potential_name
+                                })
+                                break
+                        # Check the next element's text content
+                        if hasattr(next_node, 'next_sibling'):
+                            next_node = next_node.next_sibling
+                        else:
+                            break
             
-            # Also try to find officer info in divs
-            divs = section.find_all('div')
-            for div in divs:
-                div_text = div.get_text(strip=True)
-                # Pattern: "Title PRESIDENT Name JOHN DOE"
-                title_name_pattern = r'Title\s+([A-Z\s]+)\s+Name\s+([A-Z\s,.-]+)'
-                matches = re.findall(title_name_pattern, div_text)
-                for match in matches:
-                    officers.append({
-                        'title': match[0].strip(),
-                        'name': match[1].strip()
-                    })
+            # Remove duplicates based on name
+            seen_names = set()
+            unique_officers = []
+            for officer in officers:
+                if officer['name'] not in seen_names:
+                    seen_names.add(officer['name'])
+                    unique_officers.append(officer)
+            
+            officers = unique_officers
                     
         except Exception as e:
             logger.error(f"Error extracting officers: {e}")
