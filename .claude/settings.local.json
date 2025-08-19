@@ -32,7 +32,13 @@
       "Bash(for file in test*.py)",
       "Bash(do mv \"$file\" test_scripts/)",
       "Bash(done)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(find:*)",
+      "Bash(sqlite3:*)",
+      "Bash(top -bn1)",
+      "Bash(strace:*)",
+      "Bash(lsof:*)",
+      "Bash(./monitor_batch.sh)"
     ],
     "deny": []
   }

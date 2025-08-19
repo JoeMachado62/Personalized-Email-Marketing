@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Batch Processing Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .card h2 .icon {
+            margin-right: 10px;
+            font-size: 24px;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-indicator.running {
+            background: #10b981;
+        }
+        
+        .status-indicator.stopped {
+            background: #ef4444;
+        }
+        
+        .status-indicator.waiting {
+            background: #f59e0b;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e5e7eb;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin: 10px 0;
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 5px;
+        }
+        
+        .metric-label {
+            color: #6b7280;
+        }
+        
+        .metric-value {
+            font-weight: bold;
+            color: #111827;
+        }
+        
+        .resource-meter {
+            width: 100%;
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+        
+        .resource-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        
+        .resource-fill.low {
+            background: #10b981;
+        }
+        
+        .resource-fill.medium {
+            background: #f59e0b;
+        }
+        
+        .resource-fill.high {
+            background: #ef4444;
+        }
+        
+        .log-viewer {
+            background: #1f2937;
+            color: #10b981;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .last-update {
+            text-align: center;
+            color: white;
+            margin-top: 20px;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Batch Processing Monitor</h1>
+        
+        <div class="grid">
+            <!-- Process Status -->
+            <div class="card">
+                <h2><span class="icon">⚙️</span> Process Status</h2>
+                <div class="status">
+                    <div class="status-indicator" id="process-status"></div>
+                    <span id="process-text">Checking...</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">PID:</span>
+                    <span class="metric-value" id="pid">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Uptime:</span>
+                    <span class="metric-value" id="uptime">-</span>
+                </div>
+            </div>
+            
+            <!-- Batch Progress -->
+            <div class="card">
+                <h2><span class="icon">📊</span> Batch Progress</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="batch-progress">0%</div>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Completed:</span>
+                    <span class="metric-value" id="batches-completed">0/0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Current Batch:</span>
+                    <span class="metric-value" id="current-batch">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Records Processed:</span>
+                    <span class="metric-value" id="records-processed">0</span>
+                </div>
+            </div>
+            
+            <!-- Time Estimates -->
+            <div class="card">
+                <h2><span class="icon">⏱️</span> Time Estimates</h2>
+                <div class="metric">
+                    <span class="metric-label">Elapsed:</span>
+                    <span class="metric-value" id="elapsed">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Rate:</span>
+                    <span class="metric-value" id="rate">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">ETA:</span>
+                    <span class="metric-value" id="eta">-</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Remaining:</span>
+                    <span class="metric-value" id="remaining">-</span>
+                </div>
+            </div>
+            
+            <!-- System Resources -->
+            <div class="card">
+                <h2><span class="icon">💻</span> System Resources</h2>
+                <div class="metric">
+                    <span class="metric-label">CPU:</span>
+                    <span class="metric-value" id="cpu-percent">0%</span>
+                </div>
+                <div class="resource-meter">
+                    <div class="resource-fill" id="cpu-meter"></div>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Memory:</span>
+                    <span class="metric-value" id="memory-percent">0%</span>
+                </div>
+                <div class="resource-meter">
+                    <div class="resource-fill" id="memory-meter"></div>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">Status:</span>
+                    <span class="metric-value" id="resource-status">Normal</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Logs -->
+        <div class="card">
+            <h2><span class="icon">📝</span> Recent Activity</h2>
+            <div class="log-viewer" id="log-viewer">
+                Loading logs...
+            </div>
+        </div>
+        
+        <!-- Control Buttons -->
+        <div class="card">
+            <h2><span class="icon">🎮</span> Controls</h2>
+            <div class="control-buttons">
+                <button class="btn btn-primary" onclick="refreshData()">🔄 Refresh</button>
+                <button class="btn btn-success" onclick="downloadResults()">💾 Download Results</button>
+                <button class="btn btn-danger" onclick="stopProcess()">⏹️ Stop Process</button>
+            </div>
+        </div>
+        
+        <div class="last-update">
+            Last updated: <span id="last-update">Never</span> | Auto-refresh: <span id="auto-refresh">ON</span>
+        </div>
+    </div>
+    
+    <script>
+        let autoRefresh = true;
+        let refreshInterval;
+        
+        async function fetchMonitorData() {
+            try {
+                const response = await fetch('/api/v1/batch-monitor');
+                const data = await response.json();
+                updateUI(data);
+            } catch (error) {
+                console.error('Failed to fetch monitor data:', error);
+            }
+        }
+        
+        function updateUI(data) {
+            // Process Status
+            const statusIndicator = document.getElementById('process-status');
+            const processText = document.getElementById('process-text');
+            
+            if (data.process_running) {
+                statusIndicator.className = 'status-indicator running';
+                processText.textContent = 'Running';
+                document.getElementById('pid').textContent = data.pid || '-';
+                document.getElementById('uptime').textContent = data.uptime || '-';
+            } else {
+                statusIndicator.className = 'status-indicator stopped';
+                processText.textContent = 'Stopped';
+                document.getElementById('pid').textContent = '-';
+                document.getElementById('uptime').textContent = '-';
+            }
+            
+            // Batch Progress
+            if (data.batch_stats) {
+                const progress = data.batch_stats.progress_percent || 0;
+                const progressBar = document.getElementById('batch-progress');
+                progressBar.style.width = progress + '%';
+                progressBar.textContent = progress.toFixed(1) + '%';
+                
+                document.getElementById('batches-completed').textContent = 
+                    `${data.batch_stats.completed_batches}/${data.batch_stats.total_batches}`;
+                document.getElementById('current-batch').textContent = 
+                    data.batch_stats.current_batch !== null ? `batch_${String(data.batch_stats.current_batch).padStart(4, '0')}` : '-';
+                document.getElementById('records-processed').textContent = 
+                    data.batch_stats.completed_batches * 20; // Assuming 20 records per batch
+            }
+            
+            // Time Estimates
+            if (data.time_estimate) {
+                document.getElementById('elapsed').textContent = data.time_estimate.elapsed || '-';
+                document.getElementById('rate').textContent = 
+                    data.time_estimate.rate ? `${data.time_estimate.rate.toFixed(2)} batches/hr` : '-';
+                document.getElementById('eta').textContent = data.time_estimate.eta || '-';
+                document.getElementById('remaining').textContent = 
+                    data.time_estimate.hours_remaining ? `${data.time_estimate.hours_remaining.toFixed(1)} hours` : '-';
+            }
+            
+            // System Resources
+            if (data.resources) {
+                const cpuPercent = data.resources.cpu_percent || 0;
+                const memoryPercent = data.resources.memory_percent || 0;
+                
+                document.getElementById('cpu-percent').textContent = cpuPercent.toFixed(1) + '%';
+                document.getElementById('memory-percent').textContent = memoryPercent.toFixed(1) + '%';
+                
+                // CPU meter
+                const cpuMeter = document.getElementById('cpu-meter');
+                cpuMeter.style.width = cpuPercent + '%';
+                cpuMeter.className = 'resource-fill ' + 
+                    (cpuPercent > 80 ? 'high' : cpuPercent > 60 ? 'medium' : 'low');
+                
+                // Memory meter
+                const memoryMeter = document.getElementById('memory-meter');
+                memoryMeter.style.width = memoryPercent + '%';
+                memoryMeter.className = 'resource-fill ' + 
+                    (memoryPercent > 80 ? 'high' : memoryPercent > 60 ? 'medium' : 'low');
+                
+                // Resource status
+                document.getElementById('resource-status').textContent = 
+                    data.resources.waiting ? '⚠️ Waiting for resources' : '✅ Processing';
+            }
+            
+            // Recent logs
+            if (data.recent_logs) {
+                document.getElementById('log-viewer').textContent = data.recent_logs.join('\n');
+            }
+            
+            // Update timestamp
+            document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+        }
+        
+        function refreshData() {
+            fetchMonitorData();
+        }
+        
+        function downloadResults() {
+            window.location.href = '/api/v1/download/a7e98f55_full_enriched.csv';
+        }
+        
+        async function stopProcess() {
+            if (confirm('Are you sure you want to stop the batch process?')) {
+                try {
+                    await fetch('/api/v1/batch-monitor/stop', { method: 'POST' });
+                    alert('Process stop signal sent');
+                    refreshData();
+                } catch (error) {
+                    alert('Failed to stop process: ' + error);
+                }
+            }
+        }
+        
+        function toggleAutoRefresh() {
+            autoRefresh = !autoRefresh;
+            document.getElementById('auto-refresh').textContent = autoRefresh ? 'ON' : 'OFF';
+            
+            if (autoRefresh) {
+                startAutoRefresh();
+            } else {
+                stopAutoRefresh();
+            }
+        }
+        
+        function startAutoRefresh() {
+            refreshInterval = setInterval(fetchMonitorData, 5000); // Refresh every 5 seconds
+        }
+        
+        function stopAutoRefresh() {
+            if (refreshInterval) {
+                clearInterval(refreshInterval);
+            }
+        }
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchMonitorData();
+            startAutoRefresh();
+        });
+    </script>
+</body>
+</html>

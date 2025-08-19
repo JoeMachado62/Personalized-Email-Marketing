@@ -279,6 +279,8 @@ class DataInterpreter:
                     'total_chars': profile.get('total_content_chars', 0),
                     'pages_scraped': profile.get('urls_scraped', 0)
                 }
+                # Also add as rich_content for AI processing
+                summary['rich_content'] = profile['combined_content'][:5000]
             
             # Include all the existing profile data
             summary['multi_source_profile'] = profile

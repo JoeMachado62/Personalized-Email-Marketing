@@ -286,6 +286,7 @@ class FocusedWebGatherer:
             
             # Multi-source profile with focused data
             'multi_source_profile': {
+                'sources_used': ['google_maps', 'website_multi_page', 'sunbiz'],
                 'urls_scraped': focused_result.get('website_content', {}).get('pages_scraped', 0),
                 'total_content_chars': focused_result.get('website_content', {}).get('total_chars', 0),
                 

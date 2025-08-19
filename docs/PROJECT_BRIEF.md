@@ -19,7 +19,7 @@ Current sales automation tools only handle initial outreach and require expensiv
 
 #### 1. Data Enrichment Engine
 - Web scraping via Playwright
-- DuckDuckGo search integration
+- Google Chrome and DuckDuckGo search integration
 - LinkedIn public profile discovery
 - Company website analysis
 - Contact information extraction

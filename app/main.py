@@ -115,7 +115,10 @@ app.include_router(column_mapper.router, prefix="/api/v1/mapping", tags=["column
 # Mount static files (if frontend directory exists)
 static_dir = Path("frontend")
 if static_dir.exists():
+    # Mount under /static for CSS/JS
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
+    # Also mount at root for HTML files
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
     logger.info(f"Mounted static files from {static_dir}")
 
 # Root endpoint
@@ -174,6 +177,54 @@ async def internal_error_handler(request: Request, exc):
 if __name__ == "__main__":
     import uvicorn
     import time
+    
+    # Add batch monitor endpoints
+    @app.get("/api/v1/batch-monitor")
+    async def get_batch_monitor():
+        """Get batch processing monitor data"""
+        import subprocess
+        import json
+        from pathlib import Path
+        
+        try:
+            # Run the monitor script to get JSON data
+            result = subprocess.run(
+                ["python", "monitor_batch_advanced.py", "--once", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            if result.returncode == 0:
+                data = json.loads(result.stdout)
+                
+                # Add recent logs
+                log_file = Path("batch_processing.log")
+                if log_file.exists():
+                    logs = subprocess.run(
+                        ["tail", "-10", str(log_file)],
+                        capture_output=True,
+                        text=True
+                    ).stdout.split('\n')
+                    data['recent_logs'] = [line for line in logs if line.strip()]
+                
+                return data
+            else:
+                return {"error": "Failed to get monitor data", "process_running": False}
+                
+        except Exception as e:
+            return {"error": str(e), "process_running": False}
+    
+    @app.post("/api/v1/batch-monitor/stop")
+    async def stop_batch_monitor():
+        """Stop the batch processing"""
+        import subprocess
+        
+        try:
+            subprocess.run(["pkill", "-f", "simple_batch_processor"], check=False)
+            return {"success": True, "message": "Stop signal sent"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
     
     # Run the application
     uvicorn.run(

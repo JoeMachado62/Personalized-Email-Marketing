@@ -46,14 +46,15 @@ class DealerRecord:
     separately here.
     """
 
-    def __init__(self, idx: int, name: str, address: str, phone: str, email: Optional[str] = None):
+    def __init__(self, idx: int, name: str, address: str, phone: str, email: Optional[str] = None, city: str = "", state: str = ""):
         self.idx = idx
         self.name = name
         self.address = address
         self.phone = phone
         self.email = email
-        # Derived
-        self.city = self._extract_city_from_address(address)
+        # Use provided city/state or extract from address
+        self.city = city or self._extract_city_from_address(address)
+        self.state = state
 
         # Enriched fields
         self.website: Optional[str] = None
@@ -140,39 +141,58 @@ async def _enrich_record(record: DealerRecord, concurrency_semaphore: asyncio.Se
                 company_name=record.name,
                 location=f"{record.address} {record.city}" if record.address else record.city,
                 additional_data={
+                    'city': record.city,
+                    'state': record.state,
                     'phone': record.phone,
                     'email': record.email
                 }
             )
             
-            # Step 2: Interpret data with AI (minimal token usage)
-            logger.debug(f"Interpreting data for {record.name}")
+            # Step 2: Extract factual data DIRECTLY from scraped sources (no LLM needed)
+            logger.debug(f"Extracting factual data for {record.name}")
+            
+            # Website URL - directly from Maps/scraping
+            if scraped_data.get('website_url'):
+                record.website = scraped_data['website_url']
+                logger.debug(f"Website found: {record.website}")
+            
+            # Owner information - directly from Sunbiz/scraping
+            # Check multi_source_profile first (new structure)
+            if scraped_data.get('multi_source_profile'):
+                profile = scraped_data['multi_source_profile']
+                owner_info = profile.get('owner_info', {})
+                logger.debug(f"Profile owner_info: {owner_info}")
+                if owner_info:
+                    record.owner_first_name = owner_info.get('first_name')
+                    record.owner_last_name = owner_info.get('last_name')
+                    logger.info(f"Owner found from profile: {record.owner_first_name} {record.owner_last_name}")
+            
+            # Fallback to extracted_info (focused scraper structure)
+            if not record.owner_first_name and scraped_data.get('extracted_info'):
+                extracted = scraped_data['extracted_info']
+                if extracted.get('owner_info'):
+                    owner_info = extracted['owner_info']
+                    record.owner_first_name = owner_info.get('first_name')
+                    record.owner_last_name = owner_info.get('last_name')
+                    logger.debug(f"Owner found from extracted: {record.owner_first_name} {record.owner_last_name}")
+            
+            # Contact information from scraping
+            contact_info = scraped_data.get('website_data', {}).get('contact_info', {})
+            if contact_info.get('emails') and not record.owner_email:
+                # Try to identify owner email if we have owner first name
+                if record.owner_first_name:
+                    for email in contact_info['emails']:
+                        if record.owner_first_name.lower() in email.lower():
+                            record.owner_email = email
+                            break
+                if not record.owner_email:
+                    record.owner_email = contact_info['emails'][0]  # Use first found
+            if contact_info.get('phones') and not record.owner_phone:
+                record.owner_phone = contact_info['phones'][0]
+            
+            # Step 3: Use AI ONLY for creative content generation
+            logger.debug(f"Generating personalized content for {record.name}")
             interpreted_data = await interpret_scraped_data(scraped_data, custom_prompts)
-            
-            # Step 3: Update record with findings
-            # Website
-            if interpreted_data.get('source_data', {}).get('website_found'):
-                record.website = scraped_data.get('website_url')
-            
-            # Owner information
-            owner_info = interpreted_data.get('extracted_info', {}).get('owner', {})
-            if owner_info:
-                record.owner_first_name = owner_info.get('first_name')
-                record.owner_last_name = owner_info.get('last_name')
-                # Check if we found owner contact info
-                contact_info = scraped_data.get('website_data', {}).get('contact_info', {})
-                if contact_info.get('emails'):
-                    # Try to identify owner email
-                    owner_first = owner_info.get('first_name')
-                    if owner_first:
-                        for email in contact_info['emails']:
-                            if owner_first.lower() in email.lower():
-                                record.owner_email = email
-                                break
-                    if not record.owner_email:
-                        record.owner_email = contact_info['emails'][0]  # Use first found
-                if contact_info.get('phones') and not record.owner_phone:
-                    record.owner_phone = contact_info['phones'][0]
             
             # Email content
             email_content = interpreted_data.get('generated_content', {})
@@ -219,24 +239,27 @@ async def enrich_dataframe(df: pd.DataFrame, concurrent_tasks: int = 3, mapping_
                 name=data.get('company_name', ''),
                 address=data.get('address', ''),
                 phone=data.get('phone', ''),
-                email=data.get('email')
+                email=data.get('email'),
+                city=data.get('city', ''),
+                state=data.get('state', '')
             )
-            # Add city if available
-            if 'city' in data:
-                record.city = data['city']
             records.append(record)
     else:
-        # Fallback to auto-detection
-        name_col = mapper.get_column_for_field('company_name', df) or df.columns[0]
-        addr_col = mapper.get_column_for_field('address', df) or 'Address'
-        phone_col = mapper.get_column_for_field('phone', df) or 'Phone'
-        email_col = mapper.get_column_for_field('email', df) or 'Email'
+        # Fallback to auto-detection with common column name variations
+        name_col = mapper.get_column_for_field('company_name', df) or next((c for c in df.columns if 'NAME' in c.upper()), df.columns[0])
+        addr_col = mapper.get_column_for_field('address', df) or next((c for c in df.columns if 'ADDRESS' in c.upper()), 'Address')
+        city_col = next((c for c in df.columns if 'CITY' in c.upper()), None)
+        state_col = next((c for c in df.columns if 'STATE' in c.upper()), None)
+        phone_col = mapper.get_column_for_field('phone', df) or next((c for c in df.columns if 'PHONE' in c.upper()), 'Phone')
+        email_col = mapper.get_column_for_field('email', df) or next((c for c in df.columns if 'EMAIL' in c.upper()), 'Email')
         
         for idx, row in df.iterrows():
             record = DealerRecord(
                 idx=idx,
                 name=str(row.get(name_col, '')).strip(),
                 address=str(row.get(addr_col, '')).strip(),
+                city=str(row.get(city_col, '')).strip() if city_col else '',
+                state=str(row.get(state_col, '')).strip() if state_col else '',
                 phone=str(row.get(phone_col, '')).strip(),
                 email=str(row.get(email_col, '')).strip() if pd.notna(row.get(email_col, '')) else None,
             )

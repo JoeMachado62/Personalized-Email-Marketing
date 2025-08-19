@@ -115,6 +115,7 @@ class IntelligentWebNavigator:
         self.max_pages = max_pages
         self.max_content_per_page = max_content_per_page
         self.visited_urls: Set[str] = set()
+        self.stealth_enabled = True
         
     async def navigate_and_extract(self, base_url: str) -> Dict[str, Any]:
         """
@@ -131,6 +132,10 @@ class IntelligentWebNavigator:
         # Parse base URL
         parsed_base = urlparse(base_url)
         self.base_domain = f"{parsed_base.scheme}://{parsed_base.netloc}"
+        # Normalized host variants for robust same-site checks
+        self.base_host = parsed_base.netloc.lower()
+        self.base_root = self.base_host[4:] if self.base_host.startswith('www.') else self.base_host
+        logger.info(f"Base domain: {self.base_domain} (host={self.base_host}, root={self.base_root})")
         
         # Initialize results
         results = {
@@ -155,13 +160,45 @@ class IntelligentWebNavigator:
                     args=['--disable-blink-features=AutomationControlled']
                 )
                 
+                # Enhanced stealth configuration based on modern techniques
+                import random
+                
                 context = await browser.new_context(
-                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-                    viewport={'width': 1920, 'height': 1080}
+                    user_agent=self._get_random_user_agent(),
+                    viewport={
+                        'width': 1920 + random.randint(-100, 100),  # Randomize viewport
+                        'height': 1080 + random.randint(-100, 100)
+                    },
+                    locale='en-US',
+                    timezone_id='America/New_York',
+                    permissions=['geolocation', 'notifications'],
+                    geolocation={'latitude': 40.7128, 'longitude': -74.0060},
+                    color_scheme='light',
+                    device_scale_factor=1 + (random.randint(-10, 10) / 100),  # 0.9 to 1.1
+                    is_mobile=False,
+                    has_touch=False,
+                    reduced_motion='no-preference',
+                    extra_http_headers={
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept-Encoding': 'gzip, deflate, br',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                        'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                        'Sec-Ch-Ua-Mobile': '?0',
+                        'Sec-Ch-Ua-Platform': '"Windows"',
+                        'Sec-Fetch-Dest': 'document',
+                        'Sec-Fetch-Mode': 'navigate',
+                        'Sec-Fetch-Site': 'none',
+                        'Sec-Fetch-User': '?1',
+                        'Upgrade-Insecure-Requests': '1'
+                    }
                 )
                 
                 # Start with homepage
                 page = await context.new_page()
+                
+                # Apply advanced stealth techniques
+                if self.stealth_enabled:
+                    await self._apply_stealth_scripts(page)
                 
                 # Extract homepage and discover links
                 homepage_content, discovered_links = await self._extract_page_with_links(
@@ -179,6 +216,10 @@ class IntelligentWebNavigator:
                 target_urls = self._find_target_pages(discovered_links)
                 
                 # Visit each target page
+                try:
+                    logger.info(f"Target URLs to visit: {{ {', '.join([f'{k}: {len(v)}' for k, v in target_urls.items()])} }}")
+                except Exception:
+                    pass
                 for category, urls in target_urls.items():
                     if results['pages_scraped'] >= self.max_pages:
                         break
@@ -268,32 +309,47 @@ class IntelligentWebNavigator:
             Tuple of (content_dict, discovered_links)
         """
         try:
-            # Navigate to page
-            await page.goto(url, wait_until='domcontentloaded', timeout=15000)
+            # Navigate to page with better wait strategy
+            await page.goto(url, wait_until='domcontentloaded', timeout=30000)
+            
+            # Intelligent wait strategy for dynamic content
+            await self._intelligent_wait_for_content(page)
             
             # Wait for content to load
             try:
-                await page.wait_for_load_state('networkidle', timeout=5000)
+                await page.wait_for_load_state('networkidle', timeout=10000)
             except:
                 pass  # Some pages never reach networkidle
+            
+            # Simulate human behavior to avoid detection
+            if self.stealth_enabled:
+                await self._simulate_human_behavior(page)
             
             # Get page title
             title = await page.title()
             
-            # Get all links on the page
+            # Wait a bit more for dynamic content
+            await asyncio.sleep(2)
+            
+            # Get all links on the page (including dynamically loaded)
             links = await page.evaluate("""
                 () => {
                     const links = [];
-                    document.querySelectorAll('a[href]').forEach(a => {
-                        links.push({
-                            href: a.href,
-                            text: a.innerText.trim(),
-                            title: a.title
-                        });
+                    // Wait for any lazy-loaded content
+                    const allLinks = document.querySelectorAll('a[href]');
+                    allLinks.forEach(a => {
+                        if (a.href && a.href.length > 0) {
+                            links.push({
+                                href: a.href,
+                                text: (a.innerText || a.textContent || '').trim(),
+                                title: a.title || ''
+                            });
+                        }
                     });
                     return links;
                 }
             """)
+            logger.info(f"Discovered {len(links)} links on {url}")
             
             # Get full HTML
             html_content = await page.content()
@@ -317,6 +373,14 @@ class IntelligentWebNavigator:
             
             # Clean up excessive whitespace
             markdown_content = re.sub(r'\n{3,}', '\n\n', markdown_content)
+            
+            # Check if content is too small (likely JavaScript-rendered)
+            if len(markdown_content.strip()) < 500:
+                logger.warning(f"Low content detected ({len(markdown_content)} chars), using fallback extraction")
+                fallback_content = await self._extract_with_fallback(page, url)
+                if len(fallback_content) > len(markdown_content):
+                    markdown_content = fallback_content
+                    logger.info(f"Fallback extraction improved content: {len(fallback_content)} chars")
             
             # Truncate if needed
             if len(markdown_content) > self.max_content_per_page:
@@ -346,6 +410,8 @@ class IntelligentWebNavigator:
         """
         target_urls = {}
         
+        logger.info(f"Processing {len(links)} links (base_root={getattr(self, 'base_root', '')})")
+
         for link in links:
             if not link.get('href'):
                 continue
@@ -358,8 +424,11 @@ class IntelligentWebNavigator:
             parsed = urlparse(href)
             path = parsed.path.lower()
             
-            # Skip if it's an external link (different domain)
-            if parsed.netloc and self.base_domain not in href:
+            # Skip if it's an external link (different domain), allowing http/https and www variants
+            host = parsed.netloc.lower()
+            def _norm(h: str) -> str:
+                return h[4:] if h.startswith('www.') else h
+            if host and hasattr(self, 'base_root') and not _norm(host).endswith(self.base_root):
                 continue
             
             # Skip if it matches avoid patterns
@@ -378,7 +447,10 @@ class IntelligentWebNavigator:
                             target_urls[category].append(href)
                         break
         
-        logger.info(f"Found target pages: {list(target_urls.keys())}")
+        try:
+            logger.info(f"Found target pages: {{ {', '.join([f'{k}: {len(v)}' for k, v in target_urls.items()])} }}")
+        except Exception:
+            logger.info(f"Found target pages: {list(target_urls.keys())}")
         
         return target_urls
     
@@ -563,6 +635,423 @@ class IntelligentWebNavigator:
                 prioritized.append(f"\n## HOMEPAGE EXCERPT\n{homepage['markdown'][:remaining]}")
         
         return '\n'.join(prioritized)
+    
+    def _get_random_user_agent(self) -> str:
+        """Get a random realistic user agent."""
+        import random
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
+        return random.choice(user_agents)
+    
+    async def _apply_stealth_scripts(self, page) -> None:
+        """Apply advanced stealth scripts to avoid detection."""
+        # Override navigator properties
+        await page.add_init_script("""
+            // Override navigator.webdriver
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+            
+            // Override navigator.plugins to look realistic
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [
+                    {0: {type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format", enabledPlugin: Plugin}, description: "Portable Document Format", filename: "internal-pdf-viewer", length: 1, name: "Chrome PDF Plugin"},
+                    {0: {type: "application/pdf", suffixes: "pdf", description: "", enabledPlugin: Plugin}, description: "", filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai", length: 1, name: "Chrome PDF Viewer"},
+                    {0: {type: "application/x-nacl", suffixes: "", description: "Native Client Executable", enabledPlugin: Plugin}, 1: {type: "application/x-pnacl", suffixes: "", description: "Portable Native Client Executable", enabledPlugin: Plugin}, description: "", filename: "internal-nacl-plugin", length: 2, name: "Native Client"}
+                ]
+            });
+            
+            // Override permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+            
+            // Add realistic window.chrome object
+            if (!window.chrome) {
+                window.chrome = {
+                    runtime: {},
+                    loadTimes: function() {
+                        return {
+                            requestTime: Date.now() / 1000,
+                            startLoadTime: Date.now() / 1000,
+                            commitLoadTime: Date.now() / 1000 - 0.5,
+                            finishDocumentLoadTime: Date.now() / 1000 - 0.3,
+                            finishLoadTime: Date.now() / 1000 - 0.1,
+                            firstPaintTime: Date.now() / 1000 - 0.4,
+                            firstPaintAfterLoadTime: 0,
+                            navigationType: "Other",
+                            wasFetchedViaSpdy: false,
+                            wasNpnNegotiated: true,
+                            npnNegotiatedProtocol: "h2",
+                            wasAlternateProtocolAvailable: false,
+                            connectionInfo: "h2"
+                        };
+                    },
+                    csi: function() {
+                        return {
+                            onloadT: Date.now(),
+                            pageT: Date.now() - Math.random() * 1000,
+                            startE: Date.now() - Math.random() * 2000,
+                            tran: 15
+                        };
+                    }
+                };
+            }
+            
+            // Override WebGL vendor and renderer
+            const getParameter = WebGLRenderingContext.prototype.getParameter;
+            WebGLRenderingContext.prototype.getParameter = function(parameter) {
+                if (parameter === 37445) {
+                    return 'Intel Inc.';
+                }
+                if (parameter === 37446) {
+                    return 'Intel Iris OpenGL Engine';
+                }
+                return getParameter.call(this, parameter);
+            };
+            
+            // Override hardware concurrency with realistic value
+            Object.defineProperty(navigator, 'hardwareConcurrency', {
+                get: () => 4 + Math.floor(Math.random() * 4) * 2  // 4, 6, 8, 10, or 12
+            });
+            
+            // Override screen properties
+            Object.defineProperty(screen, 'colorDepth', { get: () => 24 });
+            Object.defineProperty(screen, 'pixelDepth', { get: () => 24 });
+            
+            // Add realistic battery API
+            if ('getBattery' in navigator) {
+                const originalGetBattery = navigator.getBattery;
+                navigator.getBattery = async () => {
+                    const battery = await originalGetBattery.call(navigator);
+                    Object.defineProperty(battery, 'charging', { get: () => true });
+                    Object.defineProperty(battery, 'chargingTime', { get: () => 0 });
+                    Object.defineProperty(battery, 'dischargingTime', { get: () => Infinity });
+                    Object.defineProperty(battery, 'level', { get: () => 0.7 + Math.random() * 0.3 });
+                    return battery;
+                };
+            }
+            
+            // Override languages
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en']
+            });
+            
+            // Add touch support detection countermeasure
+            Object.defineProperty(navigator, 'maxTouchPoints', {
+                get: () => 0
+            });
+            
+            // Override automation indicators
+            delete window.navigator.__proto__.webdriver;
+            
+            // Make notification API look realistic
+            if ('Notification' in window) {
+                const OriginalNotification = window.Notification;
+                window.Notification = new Proxy(Notification, {
+                    construct(target, args) {
+                        return new OriginalNotification(...args);
+                    }
+                });
+                window.Notification.permission = 'default';
+                window.Notification.requestPermission = () => Promise.resolve('default');
+            }
+        """)
+    
+    async def _simulate_human_behavior(self, page) -> None:
+        """Simulate human-like behavior on the page."""
+        import random
+        import asyncio
+        
+        try:
+            # Random delay between 0.5 and 2 seconds
+            await asyncio.sleep(random.uniform(0.5, 2))
+            
+            # Simulate mouse movement
+            viewport_size = await page.viewport_size()
+            if viewport_size:
+                width = viewport_size['width']
+                height = viewport_size['height']
+                
+                # Move mouse in a curved path
+                steps = random.randint(3, 7)
+                for i in range(steps):
+                    x = random.randint(100, width - 100)
+                    y = random.randint(100, height - 100)
+                    await page.mouse.move(x, y, steps=random.randint(10, 30))
+                    await asyncio.sleep(random.uniform(0.1, 0.3))
+            
+            # Random scroll behavior
+            scroll_attempts = random.randint(1, 3)
+            for _ in range(scroll_attempts):
+                # Scroll down
+                scroll_distance = random.randint(100, 500)
+                await page.evaluate(f"window.scrollBy(0, {scroll_distance})")
+                await asyncio.sleep(random.uniform(0.5, 1.5))
+                
+                # Sometimes scroll back up a bit
+                if random.random() > 0.7:
+                    await page.evaluate(f"window.scrollBy(0, -{scroll_distance // 2})")
+                    await asyncio.sleep(random.uniform(0.3, 0.7))
+            
+            # Simulate reading time
+            await asyncio.sleep(random.uniform(1, 3))
+            
+            # Random mouse hover over elements
+            elements = await page.query_selector_all('a, button, input')
+            if elements and len(elements) > 0:
+                # Hover over 1-3 random elements
+                hover_count = min(len(elements), random.randint(1, 3))
+                for _ in range(hover_count):
+                    element = random.choice(elements)
+                    try:
+                        await element.hover()
+                        await asyncio.sleep(random.uniform(0.2, 0.5))
+                    except:
+                        pass
+            
+            # Move mouse to neutral position
+            if viewport_size:
+                await page.mouse.move(
+                    viewport_size['width'] // 2 + random.randint(-50, 50),
+                    viewport_size['height'] // 2 + random.randint(-50, 50),
+                    steps=random.randint(5, 15)
+                )
+        
+        except Exception as e:
+            logger.debug(f"Human behavior simulation error (non-critical): {e}")
+    
+    async def _intelligent_wait_for_content(self, page) -> None:
+        """
+        Intelligently wait for dynamic content to load using multiple strategies.
+        """
+        import asyncio
+        
+        try:
+            # Strategy 1: Wait for common loading indicators to disappear
+            loading_selectors = [
+                '.loading', '.loader', '.spinner', '#loading',
+                '[class*="loading"]', '[class*="loader"]', '[class*="spinner"]',
+                '.skeleton', '.placeholder'
+            ]
+            
+            for selector in loading_selectors:
+                try:
+                    # Wait for loader to appear and then disappear
+                    await page.wait_for_selector(selector, timeout=1000, state='attached')
+                    await page.wait_for_selector(selector, timeout=10000, state='hidden')
+                    logger.debug(f"Waited for {selector} to disappear")
+                except:
+                    pass  # Loader not found or already hidden
+            
+            # Strategy 2: Wait for content indicators
+            content_selectors = [
+                'main', 'article', '#content', '.content',
+                '[role="main"]', '.container', '#main'
+            ]
+            
+            content_found = False
+            for selector in content_selectors:
+                try:
+                    element = await page.wait_for_selector(selector, timeout=2000, state='visible')
+                    if element:
+                        # Wait for the content to have actual text
+                        await page.wait_for_function(
+                            f"""() => {{
+                                const el = document.querySelector('{selector}');
+                                return el && el.innerText && el.innerText.trim().length > 100;
+                            }}""",
+                            timeout=5000
+                        )
+                        content_found = True
+                        logger.debug(f"Content loaded in {selector}")
+                        break
+                except:
+                    pass
+            
+            # Strategy 3: Check for JavaScript frameworks
+            framework_check = await page.evaluate("""() => {
+                // Check for common JS frameworks that might be loading content
+                const frameworks = {
+                    react: window.React || document.querySelector('[data-reactroot]'),
+                    angular: window.angular || document.querySelector('[ng-app]'),
+                    vue: window.Vue || document.querySelector('#app'),
+                    nextjs: window.__NEXT_DATA__,
+                    gatsby: window.___gatsby
+                };
+                
+                for (const [name, indicator] of Object.entries(frameworks)) {
+                    if (indicator) return name;
+                }
+                return null;
+            }""")
+            
+            if framework_check:
+                logger.debug(f"Detected {framework_check} framework - waiting longer")
+                await asyncio.sleep(3)  # Extra wait for SPA frameworks
+            
+            # Strategy 4: Monitor DOM mutations
+            await page.evaluate("""() => {
+                return new Promise((resolve) => {
+                    let changeCount = 0;
+                    let lastChangeTime = Date.now();
+                    
+                    const observer = new MutationObserver(() => {
+                        changeCount++;
+                        lastChangeTime = Date.now();
+                    });
+                    
+                    observer.observe(document.body, {
+                        childList: true,
+                        subtree: true,
+                        characterData: true
+                    });
+                    
+                    // Wait until DOM is stable (no changes for 1 second)
+                    const checkInterval = setInterval(() => {
+                        const timeSinceLastChange = Date.now() - lastChangeTime;
+                        if (timeSinceLastChange > 1000 || Date.now() - startTime > 5000) {
+                            observer.disconnect();
+                            clearInterval(checkInterval);
+                            resolve(changeCount);
+                        }
+                    }, 200);
+                    
+                    const startTime = Date.now();
+                });
+            }""")
+            
+            # Strategy 5: Check for lazy-loaded images
+            await page.evaluate("""() => {
+                const images = document.querySelectorAll('img[data-src], img.lazy, img[loading="lazy"]');
+                const promises = Array.from(images).map(img => {
+                    if (img.complete) return Promise.resolve();
+                    return new Promise(resolve => {
+                        img.addEventListener('load', resolve);
+                        img.addEventListener('error', resolve);
+                        setTimeout(resolve, 2000); // Timeout after 2s per image
+                    });
+                });
+                return Promise.all(promises);
+            }""")
+            
+            # Final safety wait
+            await asyncio.sleep(1)
+            
+        except Exception as e:
+            logger.debug(f"Intelligent wait error (non-critical): {e}")
+            # Fallback to simple wait
+            await asyncio.sleep(3)
+    
+    async def _extract_with_fallback(self, page, url: str) -> str:
+        """
+        Extract content with multiple fallback strategies for JavaScript-heavy sites.
+        """
+        content = ""
+        
+        try:
+            # Method 1: Standard extraction
+            content = await page.evaluate("""() => {
+                // Try to get main content area
+                const contentSelectors = [
+                    'main', 'article', '#content', '.content',
+                    '[role="main"]', '.container', '#main', 'body'
+                ];
+                
+                for (const selector of contentSelectors) {
+                    const element = document.querySelector(selector);
+                    if (element && element.innerText && element.innerText.trim().length > 100) {
+                        return element.innerText;
+                    }
+                }
+                
+                // Fallback to body
+                return document.body.innerText || '';
+            }""")
+            
+            if len(content) < 100:
+                # Method 2: Wait and retry with different strategy
+                await asyncio.sleep(2)
+                
+                # Scroll to trigger lazy loading
+                await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                await asyncio.sleep(1)
+                await page.evaluate("window.scrollTo(0, 0)")
+                await asyncio.sleep(1)
+                
+                # Try shadow DOM extraction
+                content = await page.evaluate("""() => {
+                    function extractFromShadowDOM(root) {
+                        let text = '';
+                        
+                        // Get regular content
+                        if (root.innerText) {
+                            text += root.innerText + '\\n';
+                        }
+                        
+                        // Check for shadow roots
+                        const allElements = root.querySelectorAll('*');
+                        for (const element of allElements) {
+                            if (element.shadowRoot) {
+                                text += extractFromShadowDOM(element.shadowRoot) + '\\n';
+                            }
+                        }
+                        
+                        return text;
+                    }
+                    
+                    return extractFromShadowDOM(document.body);
+                }""")
+            
+            if len(content) < 100:
+                # Method 3: Get all text nodes directly
+                content = await page.evaluate("""() => {
+                    const walker = document.createTreeWalker(
+                        document.body,
+                        NodeFilter.SHOW_TEXT,
+                        {
+                            acceptNode: function(node) {
+                                // Skip script and style text
+                                const parent = node.parentElement;
+                                if (parent && (parent.tagName === 'SCRIPT' || parent.tagName === 'STYLE')) {
+                                    return NodeFilter.FILTER_REJECT;
+                                }
+                                // Only accept visible text
+                                if (node.nodeValue && node.nodeValue.trim().length > 0) {
+                                    return NodeFilter.FILTER_ACCEPT;
+                                }
+                                return NodeFilter.FILTER_REJECT;
+                            }
+                        }
+                    );
+                    
+                    let text = '';
+                    let node;
+                    while (node = walker.nextNode()) {
+                        text += node.nodeValue + ' ';
+                    }
+                    
+                    return text;
+                }""")
+            
+            if len(content) < 100:
+                # Method 4: Screenshot OCR fallback (indicate need for OCR)
+                logger.warning(f"Page {url} appears to be image-heavy or uses canvas rendering")
+                content = f"[LOW_CONTENT_WARNING] Page may require OCR or specialized extraction. URL: {url}"
+            
+        except Exception as e:
+            logger.error(f"Fallback extraction error for {url}: {e}")
+            content = f"[EXTRACTION_ERROR] Failed to extract content from {url}: {str(e)}"
+        
+        return content
 
 
 # Test function
