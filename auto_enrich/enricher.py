@@ -122,7 +122,7 @@ class DealerRecord:
         }
 
 
-async def _enrich_record(record: DealerRecord, concurrency_semaphore: asyncio.Semaphore, custom_prompts: dict = None) -> None:
+async def _enrich_record(record: DealerRecord, concurrency_semaphore: asyncio.Semaphore, custom_prompts: dict = None, processing_config: dict = None) -> None:
     """Internal helper to enrich a single DealerRecord.
 
     This coroutine acquires a semaphore to limit concurrency during
@@ -132,21 +132,50 @@ async def _enrich_record(record: DealerRecord, concurrency_semaphore: asyncio.Se
     exceptions are logged but do not break the entire pipeline.
     """
     async with concurrency_semaphore:
+        success_metrics = {
+            'website_found': False,
+            'owner_found': False,
+            'content_generated': False,
+            'data_sources_used': []
+        }
+        
         try:
-            logger.info(f"Enriching record: {record.name} in {record.city}")
+            logger.info(f"🚀 [START] Enriching: {record.name} in {record.city}, {record.state}")
             
-            # Step 1: Gather web data (Search + Scrape)
+            # Step 1: Gather web data (Search + Scrape) - Use modular approach if configured
             logger.debug(f"Gathering web data for {record.name}")
-            scraped_data = await gather_web_data(
-                company_name=record.name,
-                location=f"{record.address} {record.city}" if record.address else record.city,
-                additional_data={
-                    'city': record.city,
-                    'state': record.state,
-                    'phone': record.phone,
-                    'email': record.email
-                }
-            )
+            
+            if processing_config and processing_config.get('enabled_steps'):
+                # Use modular orchestrator with processing configuration
+                from .modular_enrichment_orchestrator import ModularWebGatherer
+                
+                campaign_context = processing_config.get('campaign_context', {})
+                campaign_context['processing_config'] = processing_config
+                
+                async with ModularWebGatherer(processing_config) as gatherer:
+                    scraped_data = await gatherer.search_and_gather(
+                        company_name=record.name,
+                        location=f"{record.address} {record.city}" if record.address else record.city,
+                        additional_data={
+                            'city': record.city,
+                            'state': record.state,
+                            'phone': record.phone,
+                            'email': record.email
+                        },
+                        campaign_context=campaign_context
+                    )
+            else:
+                # Use original focused approach (backward compatibility)
+                scraped_data = await gather_web_data(
+                    company_name=record.name,
+                    location=f"{record.address} {record.city}" if record.address else record.city,
+                    additional_data={
+                        'city': record.city,
+                        'state': record.state,
+                        'phone': record.phone,
+                        'email': record.email
+                    }
+                )
             
             # Step 2: Extract factual data DIRECTLY from scraped sources (no LLM needed)
             logger.debug(f"Extracting factual data for {record.name}")
@@ -154,6 +183,8 @@ async def _enrich_record(record: DealerRecord, concurrency_semaphore: asyncio.Se
             # Website URL - directly from Maps/scraping
             if scraped_data.get('website_url'):
                 record.website = scraped_data['website_url']
+                success_metrics['website_found'] = True
+                success_metrics['data_sources_used'].append('direct_scraping')
                 logger.debug(f"Website found: {record.website}")
             
             # Owner information - directly from Sunbiz/scraping
@@ -165,6 +196,8 @@ async def _enrich_record(record: DealerRecord, concurrency_semaphore: asyncio.Se
                 if owner_info:
                     record.owner_first_name = owner_info.get('first_name')
                     record.owner_last_name = owner_info.get('last_name')
+                    success_metrics['owner_found'] = True
+                    success_metrics['data_sources_used'].append('profile')
                     logger.info(f"Owner found from profile: {record.owner_first_name} {record.owner_last_name}")
             
             # Fallback to extracted_info (focused scraper structure)
@@ -192,6 +225,14 @@ async def _enrich_record(record: DealerRecord, concurrency_semaphore: asyncio.Se
             
             # Step 3: Use AI ONLY for creative content generation
             logger.debug(f"Generating personalized content for {record.name}")
+            
+            # Include campaign context if available in custom_prompts
+            campaign_context = custom_prompts if custom_prompts and 'personalization_focus' in custom_prompts else None
+            
+            # Add campaign context to scraped data for AI processing
+            if campaign_context:
+                scraped_data['campaign_context'] = campaign_context
+            
             interpreted_data = await interpret_scraped_data(scraped_data, custom_prompts)
             
             # Email content
@@ -201,15 +242,23 @@ async def _enrich_record(record: DealerRecord, concurrency_semaphore: asyncio.Se
                 icebreaker = email_content.get('icebreaker', {}).get('raw_response', '')
                 hot_button = email_content.get('hot_button', {}).get('raw_response', '')
                 record.update_from_ai(subject, icebreaker, hot_button)
+                
+                if subject or icebreaker or hot_button:
+                    success_metrics['content_generated'] = True
+                    success_metrics['data_sources_used'].append('ai_generation')
             
-            # Log confidence scores
+            # Log confidence scores and success metrics
             confidence = interpreted_data.get('confidence_scores', {})
-            logger.info(f"Enrichment confidence for {record.name}: {confidence.get('overall', 0):.2%}")
+            logger.info(f"✅ [COMPLETE] {record.name} - Website: {'✅' if success_metrics['website_found'] else '❌'}, "
+                       f"Owner: {'✅' if success_metrics['owner_found'] else '❌'}, "
+                       f"Content: {'✅' if success_metrics['content_generated'] else '❌'}, "
+                       f"Sources: {success_metrics['data_sources_used']}, "
+                       f"Confidence: {confidence.get('overall', 0):.1%}")
         except Exception as exc:
-            logger.error("Failed to enrich record %s: %s", record.name, exc)
+            logger.error("❌ [FAILED] %s: %s", record.name, exc)
 
 
-async def enrich_dataframe(df: pd.DataFrame, concurrent_tasks: int = 3, mapping_file: Optional[Path] = None, custom_prompts: dict = None) -> pd.DataFrame:
+async def enrich_dataframe(df: pd.DataFrame, concurrent_tasks: int = 3, mapping_file: Optional[Path] = None, custom_prompts: dict = None, processing_config: dict = None) -> pd.DataFrame:
     """Enrich an entire DataFrame asynchronously.
 
     This function iterates through the rows of the input DataFrame,
@@ -266,7 +315,7 @@ async def enrich_dataframe(df: pd.DataFrame, concurrent_tasks: int = 3, mapping_
             records.append(record)
 
     semaphore = asyncio.Semaphore(concurrent_tasks)
-    tasks = [asyncio.create_task(_enrich_record(rec, semaphore, custom_prompts)) for rec in records]
+    tasks = [asyncio.create_task(_enrich_record(rec, semaphore, custom_prompts, processing_config)) for rec in records]
     await asyncio.gather(*tasks)
 
     # Apply enrichment back to DataFrame using mapper

@@ -38,7 +38,11 @@
       "Bash(top -bn1)",
       "Bash(strace:*)",
       "Bash(lsof:*)",
-      "Bash(./monitor_batch.sh)"
+      "Bash(./monitor_batch.sh)",
+      "Bash(ip route:*)",
+      "Bash(ss:*)",
+      "Bash(timeout 120 python:*)",
+      "Bash(timeout:*)"
     ],
     "deny": []
   }

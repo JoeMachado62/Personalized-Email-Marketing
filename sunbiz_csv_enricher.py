@@ -142,7 +142,7 @@ def extract_owner_from_sunbiz_data(sunbiz_data: Dict) -> Dict[str, str]:
     return owner
 
 
-async def process_csv_with_sunbiz(input_file: str, output_file: str = None):
+async def process_csv_with_sunbiz(input_file: str, output_file: str = None, force: bool = False):
     """
     Process a CSV file and add owner names from Sunbiz.
     
@@ -179,6 +179,16 @@ async def process_csv_with_sunbiz(input_file: str, output_file: str = None):
             continue
         
         logger.info(f"[{i}/{len(rows)}] Looking up: {dealer_name}")
+
+        # If owner info already exists, skip Sunbiz lookup unless --force is used
+        existing_owner_first = (row.get('Owner First Name') or row.get('OwnerFirstName') or '').strip()
+        existing_owner_last = (row.get('Owner Last Name') or row.get('OwnerLastName') or '').strip()
+        if not force and (existing_owner_first or existing_owner_last):
+            logger.info(f"[{i}/{len(rows)}] Owner already present for {dealer_name}: {existing_owner_first} {existing_owner_last} — skipping Sunbiz lookup")
+            # Ensure the canonical columns are filled so output preserves values
+            row['Owner First Name'] = existing_owner_first
+            row['Owner Last Name'] = existing_owner_last
+            continue
         
         try:
             # Search on Sunbiz
@@ -273,6 +283,7 @@ async def main():
     parser.add_argument('--test', action='store_true', help='Run test lookup')
     parser.add_argument('--input', type=str, help='Input CSV file')
     parser.add_argument('--output', type=str, help='Output CSV file (optional)')
+    parser.add_argument('--force', action='store_true', help='Force re-query Sunbiz even when owner data exists')
     parser.add_argument('--limit', type=int, help='Limit number of rows to process')
     
     args = parser.parse_args()
@@ -306,12 +317,12 @@ async def main():
                 writer.writerows(rows)
             
             # Process the limited file
-            await process_csv_with_sunbiz(temp_file, output_file)
+            await process_csv_with_sunbiz(temp_file, output_file, force=args.force)
             
             # Clean up temp file
             Path(temp_file).unlink()
         else:
-            await process_csv_with_sunbiz(input_file, output_file)
+            await process_csv_with_sunbiz(input_file, output_file, force=args.force)
     else:
         # Default: process the Florida dealers CSV
         default_csv = "florida indepent dealers.csv"

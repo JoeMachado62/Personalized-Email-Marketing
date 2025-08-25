@@ -441,7 +441,8 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:8001/api/v1';
+        // Dynamic API base URL - works with localhost, WSL2 IP, or any host
+        const API_BASE = `http://${window.location.hostname}:8001/api/v1`;
         let currentFile = null;
         let currentJobId = null;
         let columnData = null;

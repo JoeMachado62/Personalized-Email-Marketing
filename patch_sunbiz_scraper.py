@@ -105,88 +105,21 @@ class SunbizScraperFixed:
                 
                 logger.info(f"Found {len(result_links)} potential matches")
                 
-                # Find the best matching result
-                best_match_link = None
-                best_match_score = 0
-                best_match_text = ""
+                # OPTIMIZATION: Take the first result (most relevant by Sunbiz ranking)
+                # Sunbiz returns results ordered by relevance, so first match is typically best
+                best_match_link = result_links[0]
+                best_match_text = await best_match_link.inner_text()
+                logger.info(f"Taking first match from {len(result_links)} results: {best_match_text}")
                 
-                def normalize_for_matching(text):
-                    """
-                    Aggressive normalization for matching:
-                    - Remove all punctuation (periods, commas, apostrophes, hyphens)
-                    - Convert to uppercase
-                    - Collapse multiple spaces
-                    - Remove common suffixes variations (INC vs INCORPORATED, LLC vs L.L.C.)
-                    """
-                    import re
-                    # Convert to uppercase
-                    text = text.upper()
-                    # Remove all punctuation
-                    text = re.sub(r'[.,\'\-&/]', ' ', text)
-                    # Normalize common business suffixes
-                    text = re.sub(r'\bINCORPORATED\b', 'INC', text)
-                    text = re.sub(r'\bCORPORATION\b', 'CORP', text)
-                    text = re.sub(r'\bCOMPANY\b', 'CO', text)
-                    text = re.sub(r'\bLIMITED\b', 'LTD', text)
-                    text = re.sub(r'\bL\s*L\s*C\b', 'LLC', text)
-                    # Collapse multiple spaces
-                    text = ' '.join(text.split())
-                    return text
+                # Optional: Quick validation that first result contains key words from business name
+                business_words = set(business_name.upper().split())
+                result_words = set(best_match_text.upper().split())
+                common_words = business_words & result_words
                 
-                business_name_normalized = normalize_for_matching(business_name)
-                
-                for link in result_links:
-                    name_text = await link.inner_text()
-                    name_text_normalized = normalize_for_matching(name_text)
-                    
-                    # Calculate match score
-                    if name_text_normalized == business_name_normalized:
-                        # Exact match after normalization
-                        best_match_link = link
-                        best_match_text = name_text
-                        logger.info(f"Found exact match: {name_text}")
-                        break
-                    
-                    # Check if one contains the other (for abbreviations like J D vs J.D.)
-                    # Remove spaces for this comparison
-                    name_no_space = name_text_normalized.replace(' ', '')
-                    business_no_space = business_name_normalized.replace(' ', '')
-                    
-                    if name_no_space == business_no_space:
-                        # Match when spaces are ignored (handles J D vs JD)
-                        best_match_link = link
-                        best_match_text = name_text
-                        logger.info(f"Found match (ignoring spaces): {name_text}")
-                        break
-                    
-                    # Check if this might be a truncated match
-                    if len(name_text) >= 95 and business_name_normalized.startswith(name_text_normalized):
-                        best_match_link = link
-                        best_match_text = name_text
-                        logger.info(f"Found potential truncated match: {name_text}")
-                        # Don't break, keep looking for better matches
-                    
-                    # Fuzzy matching - check if most words match
-                    name_words = set(name_text_normalized.split())
-                    business_words = set(business_name_normalized.split())
-                    
-                    if name_words and business_words:
-                        # Calculate Jaccard similarity
-                        intersection = name_words & business_words
-                        union = name_words | business_words
-                        similarity = len(intersection) / len(union) if union else 0
-                        
-                        # If similarity is high enough and better than current best
-                        if similarity > 0.8 and similarity > best_match_score:
-                            best_match_link = link
-                            best_match_score = similarity
-                            best_match_text = name_text
-                            logger.info(f"Found fuzzy match (similarity: {similarity:.2f}): {name_text}")
-                
-                if not best_match_link:
-                    logger.warning(f"No exact match found for: {business_name}")
-                    await browser.close()
-                    return None
+                if len(common_words) == 0:
+                    logger.warning(f"First result '{best_match_text}' has no common words with '{business_name}' - may be incorrect match")
+                else:
+                    logger.info(f"First result has {len(common_words)} common words - looks good")
                 
                 # Click on the matching result
                 await best_match_link.click()

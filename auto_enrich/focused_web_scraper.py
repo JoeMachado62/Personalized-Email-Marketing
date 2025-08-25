@@ -76,7 +76,7 @@ class FocusedWebScraper:
         
         try:
             # Step 1: Get business info from Serper Maps
-            logger.info(f"Searching Maps for: {company_name} at {full_address}")
+            logger.info(f"🔍 [STEP 1] Searching Maps for: {company_name} at {full_address}")
             maps_data = await self.serper.search_maps(company_name, full_address)
             
             if maps_data:
@@ -88,118 +88,147 @@ class FocusedWebScraper:
                 result['extracted_info']['business_type'] = maps_data.get('type')
                 result['confidence_score'] += 0.4
                 
-                logger.info(f"Maps found website: {maps_data.get('website')}")
+                logger.info(f"✅ [STEP 1] Maps SUCCESS - Website: {maps_data.get('website')}, Phone: {maps_data.get('phone')}, Rating: {maps_data.get('rating')}")
                 
                 # Step 2: Deep scrape the official website with intelligent navigation
                 if maps_data.get('website'):
-                    logger.info(f"Starting intelligent navigation of website: {maps_data['website']}")
+                    logger.info(f"🌐 [STEP 2] Starting website scraping: {maps_data['website']}")
                     
-                    # Use the intelligent navigator for comprehensive scraping
-                    nav_results = await self.web_navigator.navigate_and_extract(maps_data['website'])
-                    
-                    if nav_results and nav_results.get('pages_scraped') > 0:
-                        result['website_content'] = {
-                            'url': maps_data['website'],
-                            'pages_scraped': nav_results['pages_scraped'],
-                            'total_chars': nav_results['total_content_chars'],
-                            'categories_found': list(nav_results['content_by_category'].keys()),
-                            'team_members': nav_results.get('team_members', []),
-                            'additional_contacts': nav_results.get('contact_info', {}),
-                            'prioritized_content': nav_results.get('prioritized_content', ''),  # For AI
-                            'errors': nav_results.get('errors', [])
-                        }
+                    try:
+                        # Use the intelligent navigator for comprehensive scraping
+                        nav_results = await self.web_navigator.navigate_and_extract(maps_data['website'])
                         
-                        # Add team members to personnel tracking
-                        if nav_results.get('team_members'):
-                            if 'all_personnel' not in result['extracted_info']:
-                                result['extracted_info']['all_personnel'] = []
+                        if nav_results and nav_results.get('pages_scraped', 0) > 0:
+                            result['website_content'] = {
+                                'url': maps_data['website'],
+                                'pages_scraped': nav_results['pages_scraped'],
+                                'total_chars': nav_results['total_content_chars'],
+                                'categories_found': list(nav_results['content_by_category'].keys()),
+                                'team_members': nav_results.get('team_members', []),
+                                'additional_contacts': nav_results.get('contact_info', {}),
+                                'prioritized_content': nav_results.get('prioritized_content', ''),  # For AI
+                                'errors': nav_results.get('errors', [])
+                            }
                             
-                            for member in nav_results['team_members']:
-                                personnel_entry = f"{member.get('name', 'Unknown')}"
-                                if member.get('title'):
-                                    personnel_entry += f" ({member['title']})"
-                                result['extracted_info']['all_personnel'].append(personnel_entry)
+                            # Add team members to personnel tracking
+                            if nav_results.get('team_members'):
+                                if 'all_personnel' not in result['extracted_info']:
+                                    result['extracted_info']['all_personnel'] = []
+                                
+                                for member in nav_results['team_members']:
+                                    personnel_entry = f"{member.get('name', 'Unknown')}"
+                                    if member.get('title'):
+                                        personnel_entry += f" ({member['title']})"
+                                    result['extracted_info']['all_personnel'].append(personnel_entry)
+                                
+                                logger.info(f"Found {len(nav_results['team_members'])} team members on website")
                             
-                            logger.info(f"Found {len(nav_results['team_members'])} team members on website")
-                        
-                        result['confidence_score'] += 0.3
-                        logger.info(f"Deep scraped {nav_results['pages_scraped']} pages, "
-                                   f"{nav_results['total_content_chars']} total chars")
+                            result['confidence_score'] += 0.3
+                            logger.info(f"✅ [STEP 2] Website SUCCESS - Scraped {nav_results['pages_scraped']} pages, "
+                                       f"{nav_results['total_content_chars']} chars, Categories: {list(nav_results['content_by_category'].keys())}")
+                        else:
+                            logger.warning(f"❌ [STEP 2] Website scraping failed or returned no content for {maps_data['website']}")
+                            if nav_results and nav_results.get('errors'):
+                                logger.error(f"Website errors: {nav_results['errors']}")
+                                
+                    except Exception as e:
+                        logger.error(f"❌ [STEP 2] Website scraping exception for {maps_data['website']}: {e}")
+                else:
+                    logger.warning(f"⏭️ [STEP 2] SKIPPED - No website found in Maps data")
             else:
-                logger.warning(f"No Maps results for: {company_name}")
+                logger.warning(f"❌ [STEP 1] Maps search returned no results for {company_name}")
+                # Continue anyway, we might get data from Sunbiz
             
             # Step 3: Get corporate info from Sunbiz (Florida businesses only)
             if state and state.upper() == 'FL':
-                logger.info(f"Searching Sunbiz for: {company_name}")
-                sunbiz_data = await self.sunbiz.search_business(company_name)
-                
-                if sunbiz_data:
-                    result['sunbiz_data'] = sunbiz_data
+                logger.info(f"🏢 [STEP 3] Searching Sunbiz for: {company_name}")
+                try:
+                    sunbiz_data = await self.sunbiz.search_business(company_name)
                     
-                    # Primary owner extraction - prioritize authorized persons over officers
-                    if sunbiz_data.get('authorized_persons'):
-                        # Use first authorized person as owner (these are typically the owners/managers)
-                        auth_person = sunbiz_data['authorized_persons'][0]
+                    if sunbiz_data:
+                        result['sunbiz_data'] = sunbiz_data
+                        officer_count = len(sunbiz_data.get('officers', []))
+                        auth_count = len(sunbiz_data.get('authorized_persons', []))
+                        logger.info(f"✅ [STEP 3] Sunbiz SUCCESS - Found {officer_count} officers, {auth_count} authorized persons")
+                    else:
+                        logger.warning(f"❌ [STEP 3] Sunbiz returned no data for {company_name}")
+                        
+                except Exception as e:
+                    logger.error(f"❌ [STEP 3] Sunbiz search exception for {company_name}: {e}")
+            else:
+                logger.info(f"⏭️ [STEP 3] SKIPPED - Not a Florida business (state: {state})")
+            
+            # Step 4: Process and extract owner information from collected data
+            logger.info(f"🔧 [STEP 4] Processing collected data for owner extraction")
+            
+            # Primary owner extraction - prioritize Sunbiz authorized persons over officers
+            if result.get('sunbiz_data') and result['sunbiz_data'].get('authorized_persons'):
+                # Use first authorized person as owner (these are typically the owners/managers)
+                auth_person = result['sunbiz_data']['authorized_persons'][0]
+                logger.info(f"Using authorized person as owner: {auth_person.get('full_name', 'Unknown')}")
+                result['extracted_info']['owner_info'] = {
+                    'first_name': auth_person.get('first_name', ''),
+                    'last_name': auth_person.get('last_name', ''),
+                    'full_name': auth_person.get('full_name', ''),
+                    'title': auth_person.get('title', ''),
+                    'source': 'authorized_person'
+                }
+                result['confidence_score'] += 0.3
+                logger.info(f"Found {len(result['sunbiz_data']['authorized_persons'])} authorized persons (using as owner)")
+                        
+            elif result.get('sunbiz_data') and result['sunbiz_data'].get('officers'):
+                # Fallback to officers if no authorized persons
+                # Look for key titles that indicate ownership
+                owner_found = False
+                for officer in result['sunbiz_data']['officers']:
+                    title = officer.get('title', '').upper()
+                    if any(t in title for t in ['PRESIDENT', 'CEO', 'OWNER', 'MANAGING', 'PRINCIPAL']):
                         result['extracted_info']['owner_info'] = {
-                            'first_name': auth_person.get('first_name', ''),
-                            'last_name': auth_person.get('last_name', ''),
-                            'full_name': auth_person.get('full_name', ''),
-                            'title': auth_person.get('title', ''),
-                            'source': 'authorized_person'
+                            'first_name': officer.get('first_name', ''),
+                            'last_name': officer.get('last_name', ''),
+                            'full_name': officer.get('full_name', ''),
+                            'title': officer.get('title', ''),
+                            'source': 'officer'
                         }
-                        result['confidence_score'] += 0.3
-                        logger.info(f"Found {len(sunbiz_data['authorized_persons'])} authorized persons (using as owner)")
-                        
-                    elif sunbiz_data.get('officers'):
-                        # Fallback to officers if no authorized persons
-                        # Look for key titles that indicate ownership
-                        owner_found = False
-                        for officer in sunbiz_data['officers']:
-                            title = officer.get('title', '').upper()
-                            if any(t in title for t in ['PRESIDENT', 'CEO', 'OWNER', 'MANAGING', 'PRINCIPAL']):
-                                result['extracted_info']['owner_info'] = {
-                                    'first_name': officer.get('first_name', ''),
-                                    'last_name': officer.get('last_name', ''),
-                                    'full_name': officer.get('full_name', ''),
-                                    'title': officer.get('title', ''),
-                                    'source': 'officer'
-                                }
-                                owner_found = True
-                                break
-                        
-                        # If no owner-like title found, use the first officer
-                        if not owner_found and sunbiz_data['officers']:
-                            officer = sunbiz_data['officers'][0]
-                            result['extracted_info']['owner_info'] = {
-                                'first_name': officer.get('first_name', ''),
-                                'last_name': officer.get('last_name', ''),
-                                'full_name': officer.get('full_name', ''),
-                                'title': officer.get('title', ''),
-                                'source': 'officer'
-                            }
-                        
-                        if result['extracted_info']['owner_info']:
-                            result['confidence_score'] += 0.25
-                            logger.info(f"Found {len(sunbiz_data['officers'])} officers (using as owner)")
+                        owner_found = True
+                        logger.info(f"Using officer with owner title as owner: {officer.get('full_name', 'Unknown')}")
+                        break
+                
+                # If no owner-like title found, use the first officer
+                if not owner_found and result['sunbiz_data']['officers']:
+                    officer = result['sunbiz_data']['officers'][0]
+                    result['extracted_info']['owner_info'] = {
+                        'first_name': officer.get('first_name', ''),
+                        'last_name': officer.get('last_name', ''),
+                        'full_name': officer.get('full_name', ''),
+                        'title': officer.get('title', ''),
+                        'source': 'officer'
+                    }
+                    logger.info(f"Using first officer as owner: {officer.get('full_name', 'Unknown')}")
+                
+                if result['extracted_info'].get('owner_info'):
+                    result['confidence_score'] += 0.25
+                    logger.info(f"Found {len(result['sunbiz_data']['officers'])} officers")
                     
-                    # Store all people as additional context (for AI to use in personalization)
-                    all_people = []
-                    for person in sunbiz_data.get('authorized_persons', []):
-                        all_people.append(f"{person.get('full_name', '')} ({person.get('title', '')})")
-                    for officer in sunbiz_data.get('officers', []):
-                        all_people.append(f"{officer.get('full_name', '')} ({officer.get('title', '')})")
-                    
-                    if all_people:
-                        result['extracted_info']['all_personnel'] = all_people
-                        logger.info(f"Total personnel found: {len(all_people)} people")
-                    
-                    # Log additional corporate info
-                    if sunbiz_data.get('filing_info'):
-                        filing = sunbiz_data['filing_info']
-                        logger.info(f"Company FEIN: {filing.get('fein', 'Not found')}")
-                        logger.info(f"Date Filed: {filing.get('date_filed', 'Not found')}")
-                else:
-                    logger.warning(f"No Sunbiz data found for: {company_name}")
+            # Store all people as additional context (for AI to use in personalization)
+            if result.get('sunbiz_data'):
+                all_people = []
+                for person in result['sunbiz_data'].get('authorized_persons', []):
+                    all_people.append(f"{person.get('full_name', '')} ({person.get('title', '')})")
+                for officer in result['sunbiz_data'].get('officers', []):
+                    all_people.append(f"{officer.get('full_name', '')} ({officer.get('title', '')})")
+                
+                if all_people:
+                    result['extracted_info']['all_personnel'] = all_people
+                    logger.info(f"Total personnel found: {len(all_people)} people")
+                
+                # Log additional corporate info
+                if result['sunbiz_data'].get('filing_info'):
+                    filing = result['sunbiz_data']['filing_info']
+                    logger.info(f"Company FEIN: {filing.get('fein', 'Not found')}")
+                    logger.info(f"Date Filed: {filing.get('date_filed', 'Not found')}")
+            else:
+                logger.warning(f"No Sunbiz data found for: {company_name}")
             
             # Calculate final confidence score
             result['confidence_score'] = min(1.0, result['confidence_score'])
@@ -211,9 +240,18 @@ class FocusedWebScraper:
         # Add processing time
         result['processing_time'] = (datetime.utcnow() - start_time).total_seconds()
         
-        logger.info(f"Focused gathering complete for {company_name}: "
-                   f"confidence: {result['confidence_score']:.2%}, "
-                   f"time: {result['processing_time']:.1f}s")
+        # Final summary of what we collected
+        website = result['extracted_info'].get('website')
+        owner_info = result['extracted_info'].get('owner_info', {})
+        owner_name = owner_info.get('full_name', 'Not found')
+        content_chars = result.get('website_content', {}).get('total_chars', 0)
+        
+        logger.info(f"📊 [FINAL] {company_name} Results:")
+        logger.info(f"  🌐 Website: {website or 'Not found'}")
+        logger.info(f"  👤 Owner: {owner_name}")  
+        logger.info(f"  📄 Content: {content_chars} characters")
+        logger.info(f"  ⭐ Confidence: {result['confidence_score']:.1%}")
+        logger.info(f"  ⏱️ Time: {result['processing_time']:.1f}s")
         
         return result
 

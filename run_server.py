@@ -109,7 +109,23 @@ def main():
     # Open browser to the CORRECT interface with field mapping
     print("\nOpening browser to unified interface in 3 seconds...")
     time.sleep(3)
-    webbrowser.open("http://localhost:3001/unified.html")
+    
+    # Try to open browser (WSL2-friendly approach)
+    try:
+        # For WSL2, try wslview first, then fallback to normal webbrowser
+        if os.path.exists("/proc/version") and "microsoft" in open("/proc/version").read().lower():
+            # We're in WSL2
+            try:
+                subprocess.run(["wslview", "http://localhost:3001/unified.html"], check=True)
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                # wslview not available, just show the URL
+                print("   Please open: http://localhost:3001/unified.html in your browser")
+        else:
+            # Regular Linux/Mac/Windows
+            webbrowser.open("http://localhost:3001/unified.html")
+    except Exception as e:
+        print(f"   Could not auto-open browser: {e}")
+        print("   Please open: http://localhost:3001/unified.html in your browser")
     
     try:
         print("\nServers running. Press Ctrl+C to stop...")

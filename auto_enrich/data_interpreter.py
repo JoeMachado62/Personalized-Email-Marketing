@@ -442,6 +442,8 @@ class DataInterpreter:
         4. Use reputation/review data to identify real pain points
         5. Reference social media presence if found
         
+        PERSONALIZATION FOCUS: {self._get_focus_instructions(data_summary)}
+        
         RULES:
         1. Only extract information explicitly present in the data
         2. Do not generate or assume information not there
@@ -458,9 +460,11 @@ class DataInterpreter:
             payload = {
                 "model": LLM_MODEL_NAME,
                 "messages": [
-                    {"role": "system", "content": """You are a two-in-one expert:
+                    {"role": "system", "content": f"""You are a two-in-one expert:
 
 First, act as a Data Analyst specializing in marketing personalization. Review the data dump which includes business information, corporate ownership details, and website content. Identify unique selling points, pain points, notable achievements, industry context, and anything that would allow for a highly personalized outreach message.
+
+CRITICAL: The user has specified a personalization focus that MUST guide your analysis and content creation. Pay special attention to the PERSONALIZATION FOCUS section in the instructions.
 
 Second, switch roles to a Marketing Copywriter and transform these insights into engaging marketing material.
 
@@ -480,8 +484,8 @@ Guidelines:
 - Reference specific business details like years in business, location specifics, team members, or recent achievements.
 
 Output Format:
-SUBJECT_LINE: {short, punchy subject line here}
-ICEBREAKER: {multi-line personalized intro paragraph here}
+SUBJECT_LINE: [short, punchy subject line here]
+ICEBREAKER: [multi-line personalized intro paragraph here]
 
 Return all requested data in valid JSON format."""},
                     {"role": "user", "content": batch_prompt}
@@ -513,6 +517,81 @@ Return all requested data in valid JSON format."""},
         except Exception as e:
             logger.error(f"Batch AI extraction error: {str(e)}")
             return self._get_empty_extraction()
+    
+    def _get_focus_instructions(self, data_summary: Dict[str, Any]) -> str:
+        """
+        Generate specific instructions based on the selected personalization focus.
+        
+        Args:
+            data_summary: The prepared data summary containing campaign context
+            
+        Returns:
+            Focus-specific instructions for the AI
+        """
+        # Try to get focus from campaign_context in multiple ways
+        campaign_context = data_summary.get('campaign_context', {})
+        
+        # Handle both 'focus' and 'personalization_focus' keys
+        focus = campaign_context.get('focus') or campaign_context.get('personalization_focus', 'recent_activity')
+        
+        logger.info(f"🎯 [AI PERSONALIZATION] Using focus: {focus}")
+        
+        focus_instructions = {
+            'recent_activity': """
+                PRIORITY: Recent achievements, announcements, and current activities
+                - Look for dates, "new", "recently", "just", "announce", "launch" in the data
+                - Emphasize any time-sensitive information found
+                - Reference specific recent events or updates if found
+                - Make the icebreaker about what they're doing NOW, not their history
+            """,
+            
+            'pain_points': """
+                PRIORITY: Business challenges and areas needing improvement
+                - Identify missing features on their website (no online booking, no inventory, etc.)
+                - Look for negative reviews or complaints in the data
+                - Notice outdated technology or design elements
+                - Focus the hot button on their most pressing observed issue
+                - Frame the icebreaker around understanding their challenges
+            """,
+            
+            'growth_opportunities': """
+                PRIORITY: Expansion potential and growth indicators
+                - Look for hiring posts, new locations, or expansion mentions
+                - Identify untapped market segments based on their current focus
+                - Notice areas where they could scale or improve
+                - Frame messaging around helping them grow to the next level
+            """,
+            
+            'industry_trends': """
+                PRIORITY: Industry context and market positioning
+                - Reference their industry or market segment specifically
+                - Connect their business to broader industry changes
+                - Look for how they compare to industry standards
+                - Position your outreach as industry-relevant insights
+            """,
+            
+            'competitive_advantage': """
+                PRIORITY: Unique strengths and differentiators
+                - Identify what makes them special or unique
+                - Look for awards, certifications, or special recognitions
+                - Notice their unique selling propositions
+                - Frame messaging around enhancing their competitive edge
+            """,
+            
+            'social_proof': """
+                PRIORITY: Reviews, testimonials, and reputation
+                - Focus on their ratings, reviews, and customer feedback
+                - Look for testimonials or success stories
+                - Reference specific positive reviews or achievements
+                - Build credibility by acknowledging their reputation
+            """
+        }
+        
+        # Return the specific instructions for the selected focus, with fallback
+        instructions = focus_instructions.get(focus, focus_instructions['recent_activity'])
+        
+        # Add the focus type explicitly
+        return f"User selected '{focus}' as personalization focus.\n{instructions}"
     
     def _get_empty_extraction(self) -> Dict[str, Any]:
         """Return empty extraction structure"""
@@ -587,5 +666,28 @@ async def interpret_scraped_data(scraped_data: Dict[str, Any],
     Returns:
         Interpreted and structured data
     """
+    # Debug logging to see what data we're getting
+    content_length = 0
+    if scraped_data.get('website_content'):
+        content_length = len(str(scraped_data['website_content']))
+    
+    logger.info(f"🤖 [AI INTERPRETER] Received scraped data:")
+    logger.info(f"  📄 Content length: {content_length} characters")
+    logger.info(f"  🗂️ Data keys: {list(scraped_data.keys())}")
+    
+    if content_length == 0:
+        logger.warning(f"⚠️ [AI INTERPRETER] No website content found - limited personalization possible")
+    
     interpreter = DataInterpreter(custom_prompts)
-    return await interpreter.interpret_data(scraped_data)
+    result = await interpreter.interpret_data(scraped_data)
+    
+    # Log what we generated
+    generated_content = result.get('generated_content', {})
+    subject_generated = bool(generated_content.get('subject', {}).get('raw_response'))
+    icebreaker_generated = bool(generated_content.get('icebreaker', {}).get('raw_response'))
+    
+    logger.info(f"✅ [AI INTERPRETER] Generated content:")
+    logger.info(f"  📧 Subject line: {'✅' if subject_generated else '❌'}")
+    logger.info(f"  🧊 Icebreaker: {'✅' if icebreaker_generated else '❌'}")
+    
+    return result

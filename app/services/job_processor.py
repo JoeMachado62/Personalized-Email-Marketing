@@ -47,6 +47,24 @@ async def process_job(job_id: str):
         # Check for column mappings
         mapping_file = settings.UPLOAD_DIR / f"{job_id}_mappings.json"
         
+        # Extract processing configuration from job options
+        processing_config = None
+        campaign_context = None
+        if job.get('options'):
+            try:
+                options = json.loads(job['options']) if isinstance(job['options'], str) else job['options']
+                campaign_context = options.get('campaign_context', {})
+                processing_config = campaign_context.get('processing_config')
+                
+                if processing_config:
+                    enabled_steps = processing_config.get('enabled_steps', [])
+                    logger.info(f"Using processing configuration with {len(enabled_steps)} enabled steps: {enabled_steps}")
+                else:
+                    logger.info("No processing configuration found, using default enrichment pipeline")
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.warning(f"Failed to parse processing configuration: {e}")
+                processing_config = None
+        
         logger.info(f"Starting enrichment for {len(df)} records")
         
         # Process in batches to avoid overwhelming the API
@@ -68,7 +86,8 @@ async def process_job(job_id: str):
                 enriched_batch = await enrich_dataframe(
                     batch_df, 
                     concurrent_tasks=settings.MAX_CONCURRENT_ENRICHMENTS,
-                    mapping_file=mapping_file if mapping_file.exists() else None
+                    mapping_file=mapping_file if mapping_file.exists() else None,
+                    processing_config=processing_config
                 )
                 
                 # Append to results
